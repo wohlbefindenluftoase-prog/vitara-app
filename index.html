@@ -180,7 +180,7 @@
       msg.textContent = mode === 'login' ? 'Wird angemeldet …' : 'Konto wird erstellt …';
       msg.className = 'msg';
 
-      const { error } = mode === 'login'
+      const { data, error } = mode === 'login'
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({
             email, password,
@@ -195,7 +195,8 @@
         return;
       }
 
-      if (mode === 'register') {
+      if (mode === 'register' && !data.session) {
+        // Nur relevant, falls E-Mail-Bestätigung wieder aktiviert wird.
         msg.textContent = 'Konto erstellt! Bitte bestätige dein Konto über den Link in deiner E-Mail, dann kannst du dich anmelden.';
         msg.className = 'msg ok';
       }
@@ -230,6 +231,9 @@
     });
   }
 </script>
+
+</body>
+</html>
 
 </body>
 </html>
