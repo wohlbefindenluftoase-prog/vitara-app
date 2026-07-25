@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vitara — Dein wöchentlicher Pulse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F5F3EE;
+    --paper-dim:#EDEAE1;
+    --ink:#1D2621;
+    --pine:#3F6656;
+    --pine-dim:#2E4B3F;
+    --pulse:#8C2F3F;
+    --mist:#C9CFC7;
+    --mist-line: rgba(29,38,33,0.12);
+  }
+  *,*::before,*::after{ box-sizing:border-box; }
+  body{
+    margin:0; min-height:100vh;
+    background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Sans", sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
+  }
+  h1,h2{ font-family:"Fraunces", serif; font-weight:500; margin:0; }
+  .mono{ font-family:"IBM Plex Mono", monospace; }
+
+  .card{
+    width:100%; max-width:420px;
+    background:var(--paper-dim);
+    border:1px solid var(--mist-line);
+    border-radius:20px;
+    padding:40px 36px;
+  }
+  .logo{
+    display:flex; align-items:center; gap:8px;
+    font-family:"Fraunces", serif; font-size:20px; font-weight:600;
+    margin-bottom:28px;
+  }
+  .logo .dot{ width:9px; height:9px; border-radius:50%; background:var(--pulse); }
+
+  .tabs{ display:flex; gap:4px; margin-bottom:24px; background:var(--paper); border-radius:999px; padding:4px; }
+  .tab{
+    flex:1; text-align:center; padding:10px 0; border-radius:999px;
+    font-size:14px; font-weight:500; cursor:pointer; color:#6b756f;
+    transition:background .15s ease, color .15s ease;
+  }
+  .tab.active{ background:var(--ink); color:var(--paper); }
+
+  form{ display:flex; flex-direction:column; gap:14px; }
+  label{ font-size:13px; color:#4a5148; font-weight:500; }
+  input{
+    width:100%; margin-top:6px; padding:13px 14px;
+    border-radius:12px; border:1px solid var(--mist);
+    background:var(--paper); font-family:"IBM Plex Sans", sans-serif;
+    font-size:15px; color:var(--ink);
+  }
+  input:focus{ outline:none; border-color:var(--pine); }
+
+  .btn-primary{
+    margin-top:6px; background:var(--pulse); color:var(--paper);
+    font-weight:500; font-size:15px; padding:14px; border:none;
+    border-radius:12px; cursor:pointer; transition:transform .15s ease;
+  }
+  .btn-primary:hover{ transform:translateY(-1px); }
+  .btn-primary:disabled{ opacity:.6; cursor:default; transform:none; }
+
+  .msg{ font-size:14px; min-height:20px; margin-top:4px; }
+  .msg.err{ color:var(--pulse); }
+  .msg.ok{ color:var(--pine-dim); }
+
+  .placeholder{ text-align:center; padding:20px 0; }
+  .placeholder p{ color:#586059; font-size:14px; margin-top:10px; }
+
+  .signout{
+    margin-top:20px; background:none; border:none; color:#6b756f;
+    font-size:13px; text-decoration:underline; cursor:pointer; padding:0;
+  }
+</style>
+</head>
+<body>
+
+<div id="app" class="card"></div>
+
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+  // TODO: eure Werte aus Supabase → Project Settings → API eintragen
+  const SUPABASE_URL = 'https://DEIN-PROJEKT.supabase.co';
+  const SUPABASE_ANON_KEY = 'DEIN-ANON-KEY';
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const app = document.getElementById('app');
+
+  // ------------------------------------------------------------
+  // Router: schaltet zwischen "Seiten" um, ohne neu zu laden.
+  // Weitere Routen (Onboarding, Pulse, Insights, Home) kommen
+  // hier als eigene render-Funktionen dazu.
+  // ------------------------------------------------------------
+  const routes = {
+    '/login': renderAuth,
+    '/onboarding': renderOnboardingPlaceholder,
+  };
+
+  async function router() {
+    const path = location.hash.slice(1) || '/login';
+
+    // Eingeloggte Nutzer sollen nicht wieder auf der Login-Seite landen
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session && path === '/login') {
+      location.hash = '#/onboarding';
+      return;
+    }
+    if (!session && path !== '/login') {
+      location.hash = '#/login';
+      return;
+    }
+
+    const renderFn = routes[path] || renderAuth;
+    renderFn(session);
+  }
+
+  window.addEventListener('hashchange', router);
+  window.addEventListener('DOMContentLoaded', router);
+  supabase.auth.onAuthStateChange(() => router());
+
+  // ------------------------------------------------------------
+  // Seite: Login / Registrierung
+  // ------------------------------------------------------------
+  function renderAuth() {
+    app.innerHTML = `
+      <div class="logo"><span class="dot"></span> Vitara</div>
+      <div class="tabs">
+        <div class="tab active" id="tab-login">Anmelden</div>
+        <div class="tab" id="tab-register">Registrieren</div>
+      </div>
+      <form id="auth-form">
+        <div>
+          <label for="email">E-Mail-Adresse</label>
+          <input type="email" id="email" required autocomplete="email" />
+        </div>
+        <div>
+          <label for="password">Passwort</label>
+          <input type="password" id="password" required autocomplete="current-password" minlength="6" />
+        </div>
+        <button type="submit" class="btn-primary" id="submit-btn">Anmelden</button>
+        <p class="msg" id="auth-msg" role="status"></p>
+      </form>
+    `;
+
+    let mode = 'login'; // oder 'register'
+    const tabLogin = document.getElementById('tab-login');
+    const tabRegister = document.getElementById('tab-register');
+    const submitBtn = document.getElementById('submit-btn');
+    const msg = document.getElementById('auth-msg');
+
+    function setMode(newMode) {
+      mode = newMode;
+      tabLogin.classList.toggle('active', mode === 'login');
+      tabRegister.classList.toggle('active', mode === 'register');
+      submitBtn.textContent = mode === 'login' ? 'Anmelden' : 'Konto erstellen';
+      msg.textContent = '';
+      msg.className = 'msg';
+    }
+
+    tabLogin.addEventListener('click', () => setMode('login'));
+    tabRegister.addEventListener('click', () => setMode('register'));
+
+    document.getElementById('auth-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      submitBtn.disabled = true;
+      msg.textContent = mode === 'login' ? 'Wird angemeldet …' : 'Konto wird erstellt …';
+      msg.className = 'msg';
+
+      const { error } = mode === 'login'
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password });
+
+      submitBtn.disabled = false;
+
+      if (error) {
+        msg.textContent = translateError(error.message);
+        msg.className = 'msg err';
+        return;
+      }
+
+      if (mode === 'register') {
+        msg.textContent = 'Konto erstellt! Du wirst weitergeleitet …';
+        msg.className = 'msg ok';
+      }
+      // onAuthStateChange löst den Router automatisch aus,
+      // sobald die Session steht — keine manuelle Weiterleitung nötig.
+    });
+  }
+
+  function translateError(message) {
+    if (message.includes('Invalid login credentials')) return 'E-Mail oder Passwort ist falsch.';
+    if (message.includes('already registered')) return 'Für diese E-Mail existiert bereits ein Konto.';
+    if (message.includes('Password should be')) return 'Das Passwort muss mindestens 6 Zeichen haben.';
+    return 'Das hat leider nicht geklappt. Versuch es gleich nochmal.';
+  }
+
+  // ------------------------------------------------------------
+  // Platzhalter: Onboarding (nächster Baustein)
+  // ------------------------------------------------------------
+  function renderOnboardingPlaceholder(session) {
+    app.innerHTML = `
+      <div class="logo"><span class="dot"></span> Vitara</div>
+      <div class="placeholder">
+        <h2>Eingeloggt ✓</h2>
+        <p>Onboarding kommt als Nächstes.</p>
+        <p class="mono" style="font-size:12px; margin-top:16px;">${session.user.email}</p>
+      </div>
+      <button class="signout" id="signout-btn">Abmelden</button>
+    `;
+    document.getElementById('signout-btn').addEventListener('click', async () => {
+      await supabase.auth.signOut();
+    });
+  }
+</script>
+
+</body>
+</html>
