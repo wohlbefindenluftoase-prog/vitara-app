@@ -208,7 +208,8 @@
     if (message.includes('Invalid login credentials')) return 'E-Mail oder Passwort ist falsch.';
     if (message.includes('already registered')) return 'Für diese E-Mail existiert bereits ein Konto.';
     if (message.includes('Password should be')) return 'Das Passwort muss mindestens 6 Zeichen haben.';
-    return 'Das hat leider nicht geklappt. Versuch es gleich nochmal.';
+    // Temporär: unbekannte Fehler im Klartext anzeigen, um die Ursache einzugrenzen.
+    return 'Fehler: ' + message;
   }
 
   // ------------------------------------------------------------
@@ -229,9 +230,6 @@
     });
   }
 </script>
-
-</body>
-</html>
 
 </body>
 </html>
