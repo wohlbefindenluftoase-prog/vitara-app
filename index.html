@@ -182,7 +182,10 @@
 
       const { error } = mode === 'login'
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        : await supabase.auth.signUp({
+            email, password,
+            options: { emailRedirectTo: window.location.origin + window.location.pathname }
+          });
 
       submitBtn.disabled = false;
 
@@ -193,7 +196,7 @@
       }
 
       if (mode === 'register') {
-        msg.textContent = 'Konto erstellt! Du wirst weitergeleitet …';
+        msg.textContent = 'Konto erstellt! Bitte bestätige dein Konto über den Link in deiner E-Mail, dann kannst du dich anmelden.';
         msg.className = 'msg ok';
       }
       // onAuthStateChange löst den Router automatisch aus,
@@ -226,6 +229,9 @@
     });
   }
 </script>
+
+</body>
+</html>
 
 </body>
 </html>
