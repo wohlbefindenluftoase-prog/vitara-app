@@ -9,14 +9,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --paper:#F5F3EE;
-    --paper-dim:#EDEAE1;
-    --ink:#1D2621;
-    --pine:#3F6656;
-    --pine-dim:#2E4B3F;
-    --pulse:#8C2F3F;
-    --mist:#C9CFC7;
-    --mist-line: rgba(29,38,33,0.12);
+    --paper:#EAF6EF;
+    --paper-dim:#FFFFFF;
+    --ink:#13221A;
+    --pine:#3E8F68;
+    --pine-dim:#16281F;
+    --pulse:#16281F;
+    --mist:#DCEEE3;
+    --mist-line: rgba(19,34,26,0.10);
+    --error:#B3423A;
   }
   *,*::before,*::after{ box-sizing:border-box; }
   body{
@@ -70,7 +71,7 @@
   .btn-primary:disabled{ opacity:.6; cursor:default; transform:none; }
 
   .msg{ font-size:14px; min-height:20px; margin-top:4px; }
-  .msg.err{ color:var(--pulse); }
+  .msg.err{ color:var(--error); }
   .msg.ok{ color:var(--pine-dim); }
 
   .placeholder{ text-align:center; padding:20px 0; }
