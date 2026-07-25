@@ -36,7 +36,9 @@
     border:1px solid var(--mist-line);
     border-radius:20px;
     padding:40px 36px;
+    transition:max-width .2s ease;
   }
+  .card.wide{ max-width:560px; }
   .logo{
     display:flex; align-items:center; gap:8px;
     font-family:"Fraunces", serif; font-size:20px; font-weight:600;
@@ -54,13 +56,16 @@
 
   form{ display:flex; flex-direction:column; gap:14px; }
   label{ font-size:13px; color:#4a5148; font-weight:500; }
-  input{
+  input, select{
     width:100%; margin-top:6px; padding:13px 14px;
     border-radius:12px; border:1px solid var(--mist);
     background:var(--paper); font-family:"IBM Plex Sans", sans-serif;
     font-size:15px; color:var(--ink);
   }
-  input:focus{ outline:none; border-color:var(--pine); }
+  input:focus, select:focus{ outline:none; border-color:var(--pine); }
+  select{ appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23586059'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center; }
+  .row-2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:480px){ .row-2{ grid-template-columns:1fr; } }
 
   .btn-primary{
     margin-top:6px; background:var(--pulse); color:var(--paper);
@@ -81,6 +86,38 @@
     margin-top:20px; background:none; border:none; color:#6b756f;
     font-size:13px; text-decoration:underline; cursor:pointer; padding:0;
   }
+
+  /* ---------- Onboarding wizard ---------- */
+  .progress-dots{ display:flex; gap:6px; margin-bottom:28px; }
+  .progress-dots .dot-step{
+    flex:1; height:4px; border-radius:999px; background:var(--mist);
+    transition:background .2s ease;
+  }
+  .progress-dots .dot-step.done{ background:var(--pine); }
+
+  .step-title{ font-size:21px; margin-bottom:6px; }
+  .step-sub{ font-size:14px; color:#586059; margin-bottom:22px; line-height:1.5; }
+
+  .choice-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px; }
+  @media (max-width:480px){ .choice-grid{ grid-template-columns:1fr; } }
+  .choice-card{
+    text-align:left; padding:14px 16px; border-radius:12px;
+    border:1px solid var(--mist); background:var(--paper);
+    font-family:"IBM Plex Sans", sans-serif; font-size:14.5px; color:var(--ink);
+    cursor:pointer; transition:border-color .15s ease, background .15s ease;
+  }
+  .choice-card:hover{ border-color:var(--pine); }
+  .choice-card.selected{ border-color:var(--pine); background:var(--paper-dim); box-shadow:inset 0 0 0 1.5px var(--pine); }
+  .choice-card .title{ font-weight:500; }
+  .choice-card .sub{ font-size:12.5px; color:#7a8279; margin-top:2px; }
+
+  .step-nav{ display:flex; align-items:center; justify-content:space-between; margin-top:24px; gap:12px; }
+  .step-nav .btn-primary{ margin-top:0; flex:1; }
+  .link-btn{
+    background:none; border:none; color:#6b756f; font-size:14px;
+    cursor:pointer; padding:8px 4px; font-family:"IBM Plex Sans", sans-serif;
+  }
+  .link-btn:hover{ color:var(--ink); }
 </style>
 </head>
 <body>
@@ -104,25 +141,46 @@
   // ------------------------------------------------------------
   const routes = {
     '/login': renderAuth,
-    '/onboarding': renderOnboardingPlaceholder,
+    '/onboarding': renderOnboarding,
+    '/home': renderHomePlaceholder,
   };
 
   async function router() {
     const path = location.hash.slice(1) || '/login';
-
-    // Eingeloggte Nutzer sollen nicht wieder auf der Login-Seite landen
     const { data: { session } } = await supabase.auth.getSession();
-    if (session && path === '/login') {
-      location.hash = '#/onboarding';
+
+    if (!session) {
+      if (path !== '/login') { location.hash = '#/login'; return; }
+      app.classList.remove('wide');
+      renderAuth();
       return;
     }
-    if (!session && path !== '/login') {
-      location.hash = '#/login';
+
+    // Eingeloggt: Profil laden, um zu wissen, ob Onboarding nötig ist
+    // und wo genau ein unterbrochenes Onboarding weitergeht.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, birthday, gender, height_cm, weight_kg, activity_level, primary_goal, onboarding_step, onboarding_completed')
+      .eq('id', session.user.id)
+      .single();
+
+    const onboardingDone = profile?.onboarding_completed === true;
+
+    if (path === '/login') {
+      location.hash = onboardingDone ? '#/home' : '#/onboarding';
+      return;
+    }
+    if (path === '/onboarding' && onboardingDone) {
+      location.hash = '#/home';
+      return;
+    }
+    if (path === '/home' && !onboardingDone) {
+      location.hash = '#/onboarding';
       return;
     }
 
     const renderFn = routes[path] || renderAuth;
-    renderFn(session);
+    renderFn(session, profile);
   }
 
   window.addEventListener('hashchange', router);
@@ -214,14 +272,271 @@
   }
 
   // ------------------------------------------------------------
-  // Platzhalter: Onboarding (nächster Baustein)
+  // Seite: Onboarding (mehrstufiger, unterbrechbarer Wizard)
   // ------------------------------------------------------------
-  function renderOnboardingPlaceholder(session) {
+  const ACTIVITY_OPTIONS = [
+    { value: 'sedentary', title: 'Überwiegend sitzend', sub: 'Wenig Bewegung im Alltag' },
+    { value: 'light', title: 'Leicht aktiv', sub: 'Gelegentlich Sport' },
+    { value: 'moderate', title: 'Moderat aktiv', sub: 'Regelmäßig Sport' },
+    { value: 'high', title: 'Sehr aktiv', sub: 'Mehrmals wöchentlich intensiv' },
+  ];
+
+  const GOAL_OPTIONS = [
+    { value: 'Energy', title: 'Mehr Energie', sub: 'Im Alltag spürbar mehr Antrieb' },
+    { value: 'Recovery', title: 'Bessere Erholung', sub: 'Nach Belastung schneller regenerieren' },
+    { value: 'Performance', title: 'Leistungsfähigkeit', sub: 'Fokus & Produktivität steigern' },
+    { value: 'Resilience', title: 'Stressresistenz', sub: 'Gelassener mit Belastung umgehen' },
+    { value: 'Longevity', title: 'Langfristige Gesundheit', sub: 'Nachhaltige Gewohnheiten aufbauen' },
+    { value: '', title: 'Noch unklar', sub: 'Zeig mir einfach, wo ich stehe' },
+  ];
+
+  function renderOnboarding(session, profile) {
+    app.classList.add('wide');
+
+    // Lokaler Arbeitsstand, vorbefüllt aus dem Profil (Wiedereinstieg)
+    const data = {
+      first_name: profile?.first_name || '',
+      last_name: profile?.last_name || '',
+      birthday: profile?.birthday || '',
+      gender: profile?.gender || '',
+      height_cm: profile?.height_cm || '',
+      weight_kg: profile?.weight_kg || '',
+      activity_level: profile?.activity_level || '',
+      primary_goal: profile?.primary_goal ?? '',
+    };
+
+    const steps = ['welcome', 'basics', 'body', 'activity', 'goal', 'done'];
+    let stepIndex = Math.min(profile?.onboarding_step || 0, steps.length - 1);
+
+    renderStep();
+
+    // ---------------- Schritt-Templates ----------------
+    function fieldsFor(step) {
+      if (step === 'welcome') return `
+        <label for="first_name">Vorname</label>
+        <input type="text" id="first_name" value="${escapeAttr(data.first_name)}" autocomplete="given-name" placeholder="Wie dürfen wir dich nennen?" />
+      `;
+      if (step === 'basics') return `
+        <div class="row-2">
+          <div>
+            <label for="birthday">Geburtsdatum (optional)</label>
+            <input type="date" id="birthday" value="${escapeAttr(data.birthday)}" />
+          </div>
+          <div>
+            <label for="gender">Geschlecht (optional)</label>
+            <select id="gender">
+              <option value="" ${data.gender === '' ? 'selected' : ''}>Keine Angabe</option>
+              <option value="weiblich" ${data.gender === 'weiblich' ? 'selected' : ''}>Weiblich</option>
+              <option value="männlich" ${data.gender === 'männlich' ? 'selected' : ''}>Männlich</option>
+              <option value="divers" ${data.gender === 'divers' ? 'selected' : ''}>Divers</option>
+            </select>
+          </div>
+        </div>
+      `;
+      if (step === 'body') return `
+        <div class="row-2">
+          <div>
+            <label for="height_cm">Größe in cm (optional)</label>
+            <input type="number" id="height_cm" min="100" max="250" value="${escapeAttr(data.height_cm)}" />
+          </div>
+          <div>
+            <label for="weight_kg">Gewicht in kg (optional)</label>
+            <input type="number" id="weight_kg" min="30" max="300" step="0.1" value="${escapeAttr(data.weight_kg)}" />
+          </div>
+        </div>
+      `;
+      if (step === 'activity') return renderChoiceGrid('activity_level', ACTIVITY_OPTIONS, data.activity_level);
+      if (step === 'goal') return renderChoiceGrid('primary_goal', GOAL_OPTIONS, data.primary_goal);
+      return '';
+    }
+
+    function renderChoiceGrid(fieldId, options, selected) {
+      return `
+        <div class="choice-grid" id="${fieldId}-grid" data-field="${fieldId}">
+          ${options.map(opt => `
+            <button type="button" class="choice-card ${opt.value === selected ? 'selected' : ''}" data-value="${escapeAttr(opt.value)}">
+              <div class="title">${opt.title}</div>
+              <div class="sub">${opt.sub}</div>
+            </button>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    const STEP_COPY = {
+      welcome: {
+        title: 'Schön, dass du da bist.',
+        sub: 'Ein paar kurze Fragen, dann kann’s losgehen. Du kannst jederzeit pausieren — nichts geht verloren.',
+      },
+      basics: {
+        title: 'Ein bisschen mehr über dich',
+        sub: 'Hilft uns später, deinen Pulse Score richtig einzuordnen.',
+      },
+      body: {
+        title: 'Deine Basisdaten',
+        sub: 'Komplett optional — überspring diesen Schritt gern, wenn du magst.',
+      },
+      activity: {
+        title: 'Wie aktiv bist du aktuell?',
+        sub: '',
+      },
+      goal: {
+        title: 'Worauf möchtest du dich zuerst konzentrieren?',
+        sub: 'Das macht deine ersten Erkenntnisse gezielter — du kannst das später jederzeit ändern.',
+      },
+    };
+
+    function renderStep() {
+      const step = steps[stepIndex];
+
+      if (step === 'done') {
+        renderDone();
+        return;
+      }
+
+      const copy = STEP_COPY[step];
+      const isFirst = stepIndex === 0;
+      const isOptionalStep = step === 'basics' || step === 'body';
+
+      app.innerHTML = `
+        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="progress-dots">
+          ${steps.slice(0, -1).map((_, i) => `<div class="dot-step ${i <= stepIndex ? 'done' : ''}"></div>`).join('')}
+        </div>
+        <h2 class="step-title">${copy.title}</h2>
+        ${copy.sub ? `<p class="step-sub">${copy.sub}</p>` : '<div style="margin-bottom:6px;"></div>'}
+        <form id="step-form">
+          ${fieldsFor(step)}
+          <p class="msg" id="step-msg" role="status"></p>
+          <div class="step-nav">
+            ${isFirst ? '' : '<button type="button" class="link-btn" id="back-btn">Zurück</button>'}
+            <button type="submit" class="btn-primary" id="next-btn">Weiter</button>
+          </div>
+          ${isOptionalStep ? '<button type="button" class="link-btn" id="skip-btn" style="margin-top:8px;">Überspringen</button>' : ''}
+        </form>
+      `;
+
+      // Auswahlkarten (activity/goal) klickbar machen
+      app.querySelectorAll('.choice-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const grid = card.closest('.choice-grid');
+          grid.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+        });
+      });
+
+      document.getElementById('back-btn')?.addEventListener('click', () => {
+        collectStep(step, { silent: true });
+        stepIndex -= 1;
+        renderStep();
+      });
+
+      document.getElementById('skip-btn')?.addEventListener('click', () => goNext(step, { skipped: true }));
+
+      document.getElementById('step-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        goNext(step);
+      });
+    }
+
+    async function goNext(step, { skipped = false } = {}) {
+      if (!skipped && step === 'welcome' && !document.getElementById('first_name').value.trim()) {
+        const msg = document.getElementById('step-msg');
+        msg.textContent = 'Ein Vorname hilft uns, dich ansprechen zu können.';
+        msg.className = 'msg err';
+        return;
+      }
+
+      if (!skipped) collectStep(step);
+
+      const nextBtn = document.getElementById('next-btn');
+      nextBtn.disabled = true;
+
+      const nextIndex = stepIndex + 1;
+      const { error } = await supabase
+        .from('profiles')
+        .update({ ...data, onboarding_step: nextIndex })
+        .eq('id', session.user.id);
+
+      if (error) {
+        nextBtn.disabled = false;
+        const msg = document.getElementById('step-msg');
+        msg.textContent = 'Fehler: ' + error.message;
+        msg.className = 'msg err';
+        return;
+      }
+
+      stepIndex = nextIndex;
+      renderStep();
+    }
+
+    function collectStep(step) {
+      if (step === 'welcome') {
+        data.first_name = document.getElementById('first_name').value.trim();
+      }
+      if (step === 'basics') {
+        data.birthday = document.getElementById('birthday').value || null;
+        data.gender = document.getElementById('gender').value || null;
+      }
+      if (step === 'body') {
+        const h = document.getElementById('height_cm').value;
+        const w = document.getElementById('weight_kg').value;
+        data.height_cm = h ? Number(h) : null;
+        data.weight_kg = w ? Number(w) : null;
+      }
+      if (step === 'activity') {
+        const selected = document.querySelector('#activity_level-grid .choice-card.selected');
+        data.activity_level = selected ? selected.dataset.value : null;
+      }
+      if (step === 'goal') {
+        const selected = document.querySelector('#primary_goal-grid .choice-card.selected');
+        data.primary_goal = selected ? selected.dataset.value : null;
+      }
+    }
+
+    async function renderDone() {
+      const goalLabel = GOAL_OPTIONS.find(g => g.value === data.primary_goal)?.title || 'deine Gesundheit';
+      app.innerHTML = `
+        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="placeholder">
+          <h2>Alles bereit${data.first_name ? ', ' + escapeHtml(data.first_name) : ''}.</h2>
+          <p>Dein erster Pulse dauert nur etwa 10 Minuten und gibt dir ein erstes Bild zu <strong>${escapeHtml(goalLabel)}</strong> — und den anderen vier Dimensionen gleich mit.</p>
+        </div>
+        <button class="btn-primary" id="start-pulse-btn" style="margin-top:8px;">Ersten Pulse starten →</button>
+      `;
+
+      document.getElementById('start-pulse-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('start-pulse-btn');
+        btn.disabled = true;
+        await supabase
+          .from('profiles')
+          .update({ onboarding_completed: true, onboarding_step: steps.length - 1 })
+          .eq('id', session.user.id);
+        location.hash = '#/home';
+      });
+    }
+  }
+
+  function escapeAttr(value) {
+    return String(value ?? '').replace(/"/g, '&quot;');
+  }
+  function escapeHtml(value) {
+    const div = document.createElement('div');
+    div.textContent = String(value ?? '');
+    return div.innerHTML;
+  }
+
+  // ------------------------------------------------------------
+  // Platzhalter: Home (nächster Baustein: Pulse-Fragebogen)
+  // ------------------------------------------------------------
+  function renderHomePlaceholder(session, profile) {
+    app.classList.remove('wide');
+    const name = profile?.first_name ? `, ${profile.first_name}` : '';
     app.innerHTML = `
       <div class="logo"><span class="dot"></span> Vitara</div>
       <div class="placeholder">
-        <h2>Eingeloggt ✓</h2>
-        <p>Onboarding kommt als Nächstes.</p>
+        <h2>Willkommen${name} ✓</h2>
+        <p>Der Pulse-Fragebogen kommt als Nächstes.</p>
         <p class="mono" style="font-size:12px; margin-top:16px;">${session.user.email}</p>
       </div>
       <button class="signout" id="signout-btn">Abmelden</button>
@@ -231,9 +546,6 @@
     });
   }
 </script>
-
-</body>
-</html>
 
 </body>
 </html>
