@@ -118,6 +118,30 @@
     cursor:pointer; padding:8px 4px; font-family:"IBM Plex Sans", sans-serif;
   }
   .link-btn:hover{ color:var(--ink); }
+
+  /* ---------- Pulse questionnaire ---------- */
+  .scale-row{ display:flex; gap:6px; flex-wrap:wrap; }
+  .scale-btn{
+    width:38px; height:38px; border-radius:10px;
+    border:1px solid var(--mist); background:var(--paper);
+    font-family:"IBM Plex Mono", monospace; font-size:14px; color:var(--ink);
+    cursor:pointer; transition:border-color .15s ease, background .15s ease;
+  }
+  .scale-btn:hover{ border-color:var(--pine); }
+  .scale-btn.selected{ border-color:var(--pine); background:var(--pine); color:#fff; }
+  .scale-labels{ display:flex; justify-content:space-between; font-size:12px; color:#7a8279; margin-top:8px; }
+
+  .gauge-wrap{ position:relative; width:180px; height:180px; margin:16px auto 8px; }
+  .gauge-wrap svg{ width:100%; height:100%; }
+  .gauge-center{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .gauge-center .num{ font-family:"Fraunces", serif; font-size:42px; font-weight:600; }
+  .gauge-center .label{ font-family:"IBM Plex Mono", monospace; font-size:10.5px; letter-spacing:0.05em; color:#7a8279; margin-top:2px; }
+
+  .metric-row{ margin-top:16px; text-align:left; }
+  .metric-row .top{ display:flex; justify-content:space-between; font-size:14px; margin-bottom:6px; }
+  .metric-row .top .val{ font-weight:600; }
+  .bar-track{ height:7px; background:var(--mist); border-radius:999px; overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:999px; background:linear-gradient(90deg, var(--pine-dim), var(--pine)); }
 </style>
 </head>
 <body>
@@ -143,6 +167,7 @@
     '/login': renderAuth,
     '/onboarding': renderOnboarding,
     '/home': renderHomePlaceholder,
+    '/pulse': renderPulse,
   };
 
   async function router() {
@@ -170,11 +195,10 @@
       location.hash = onboardingDone ? '#/home' : '#/onboarding';
       return;
     }
-    if (path === '/onboarding' && onboardingDone) {
-      location.hash = '#/home';
-      return;
-    }
-    if (path === '/home' && !onboardingDone) {
+    if (path === '/onboarding') {
+      if (onboardingDone) { location.hash = '#/home'; return; }
+    } else if (!onboardingDone) {
+      // Jede andere Route (Home, Pulse, künftige Seiten) braucht abgeschlossenes Onboarding
       location.hash = '#/onboarding';
       return;
     }
@@ -567,7 +591,7 @@
           .from('profiles')
           .update({ onboarding_completed: true, onboarding_step: steps.length - 1 })
           .eq('id', session.user.id);
-        location.hash = '#/home';
+        location.hash = '#/pulse';
       });
     }
   }
@@ -582,6 +606,217 @@
   }
 
   // ------------------------------------------------------------
+  // Seite: Pulse-Fragebogen
+  // ------------------------------------------------------------
+  const CATEGORY_LABELS = {
+    Energy: 'Energy', Recovery: 'Recovery', Performance: 'Performance',
+    Resilience: 'Resilience', Longevity: 'Longevity',
+  };
+
+  async function renderPulse(session) {
+    app.classList.add('wide');
+    app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Dein Pulse wird vorbereitet …</p>`;
+
+    const { data: questions, error: qError } = await supabase
+      .from('questions')
+      .select('id, category, question_text, answer_type, min_value, max_value, sort_order')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (qError || !questions || questions.length === 0) {
+      app.innerHTML = `
+        <div class="logo"><span class="dot"></span> Vitara</div>
+        <p class="msg err">Der Fragebogen konnte nicht geladen werden${qError ? ': ' + escapeHtml(qError.message) : ''}.</p>
+      `;
+      return;
+    }
+
+    // Offene (nicht abgeschlossene) Session suchen, sonst neue anlegen
+    const { data: openSessions } = await supabase
+      .from('pulse_sessions')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .eq('completed', false)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    let pulseSessionId;
+    let answeredQuestionIds = [];
+
+    if (openSessions && openSessions.length > 0) {
+      pulseSessionId = openSessions[0].id;
+      const { data: existingAnswers } = await supabase
+        .from('pulse_answers')
+        .select('question_id')
+        .eq('pulse_session_id', pulseSessionId);
+      answeredQuestionIds = (existingAnswers || []).map(a => a.question_id);
+    } else {
+      const { data: newSession, error: sError } = await supabase
+        .from('pulse_sessions')
+        .insert({ user_id: session.user.id, pulse_date: new Date().toISOString() })
+        .select('id')
+        .single();
+      if (sError) {
+        app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="msg err">Fehler: ${escapeHtml(sError.message)}</p>`;
+        return;
+      }
+      pulseSessionId = newSession.id;
+    }
+
+    const remaining = questions.filter(q => !answeredQuestionIds.includes(q.id));
+    let qIndex = 0;
+
+    renderQuestion();
+
+    function renderQuestion() {
+      if (qIndex >= remaining.length) { finishPulse(); return; }
+
+      const q = remaining[qIndex];
+      const answeredSoFar = answeredQuestionIds.length + qIndex;
+
+      app.innerHTML = `
+        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="progress-dots">
+          ${questions.map((_, i) => `<div class="dot-step ${i < answeredSoFar ? 'done' : ''}"></div>`).join('')}
+        </div>
+        <p class="mono" style="font-size:11.5px; color:#7a8279; margin-bottom:6px;">${CATEGORY_LABELS[q.category] || q.category} · FRAGE ${answeredSoFar + 1} VON ${questions.length}</p>
+        <h2 class="step-title">${escapeHtml(q.question_text)}</h2>
+        <div style="margin-top:20px;">${renderAnswerInput(q)}</div>
+        <p class="msg" id="pulse-msg" role="status"></p>
+        <div class="step-nav" style="margin-top:20px;">
+          <button type="button" class="btn-primary" id="pulse-next-btn">Weiter</button>
+        </div>
+        <button class="signout" id="signout-btn" style="margin-top:20px;">Abmelden</button>
+      `;
+
+      if (q.answer_type === 'scale' || q.answer_type === 'scale_reverse') {
+        document.querySelectorAll('#answer-scale .scale-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            document.querySelectorAll('#answer-scale .scale-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+          });
+        });
+      }
+
+      document.getElementById('signout-btn').addEventListener('click', async () => { await supabase.auth.signOut(); });
+      document.getElementById('pulse-next-btn').addEventListener('click', () => submitAnswer(q));
+    }
+
+    function renderAnswerInput(q) {
+      if (q.answer_type === 'scale' || q.answer_type === 'scale_reverse') {
+        const min = q.min_value ?? 1, max = q.max_value ?? 10;
+        const values = [];
+        for (let v = min; v <= max; v++) values.push(v);
+        return `
+          <div class="scale-row" id="answer-scale">
+            ${values.map(v => `<button type="button" class="scale-btn" data-value="${v}">${v}</button>`).join('')}
+          </div>
+          <div class="scale-labels">
+            <span>${q.answer_type === 'scale_reverse' ? 'Gar nicht' : 'Sehr niedrig'}</span>
+            <span>${q.answer_type === 'scale_reverse' ? 'Sehr stark' : 'Sehr hoch'}</span>
+          </div>
+        `;
+      }
+      return `<input type="number" id="answer-number" min="${q.min_value ?? ''}" max="${q.max_value ?? ''}" placeholder="Zahl eingeben" />`;
+    }
+
+    async function submitAnswer(q) {
+      const msg = document.getElementById('pulse-msg');
+      let value = null;
+
+      if (q.answer_type === 'scale' || q.answer_type === 'scale_reverse') {
+        const selected = document.querySelector('#answer-scale .scale-btn.selected');
+        if (!selected) { msg.textContent = 'Bitte wähl einen Wert aus.'; msg.className = 'msg err'; return; }
+        value = Number(selected.dataset.value);
+      } else {
+        const input = document.getElementById('answer-number');
+        if (input.value === '') { msg.textContent = 'Bitte gib einen Wert ein.'; msg.className = 'msg err'; return; }
+        value = Number(input.value);
+      }
+
+      const nextBtn = document.getElementById('pulse-next-btn');
+      nextBtn.disabled = true;
+
+      const { error } = await supabase.from('pulse_answers').insert({
+        pulse_session_id: pulseSessionId,
+        question_id: q.id,
+        user_id: session.user.id,
+        answer_value: value,
+      });
+
+      if (error) {
+        nextBtn.disabled = false;
+        msg.textContent = 'Fehler: ' + error.message;
+        msg.className = 'msg err';
+        return;
+      }
+
+      qIndex += 1;
+      renderQuestion();
+    }
+
+    async function finishPulse() {
+      app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Dein Pulse Score wird berechnet …</p>`;
+
+      const { error } = await supabase.rpc('calculate_pulse_scores', { p_session_id: pulseSessionId });
+
+      if (error) {
+        app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="msg err">Fehler: ${escapeHtml(error.message)}</p>`;
+        return;
+      }
+
+      const { data: result } = await supabase
+        .from('pulse_sessions')
+        .select('pulse_score, energy_score, recovery_score, performance_score, resilience_score, longevity_score')
+        .eq('id', pulseSessionId)
+        .single();
+
+      renderResult(result);
+    }
+
+    function renderResult(scores) {
+      const circumference = 2 * Math.PI * 78;
+      const offset = circumference - (Math.max(0, Math.min(100, scores.pulse_score)) / 100) * circumference;
+
+      const dims = [
+        ['Energy', scores.energy_score],
+        ['Recovery', scores.recovery_score],
+        ['Performance', scores.performance_score],
+        ['Resilience', scores.resilience_score],
+        ['Longevity', scores.longevity_score],
+      ];
+
+      app.innerHTML = `
+        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div style="text-align:center;">
+          <p class="mono" style="font-size:11.5px; color:#7a8279;">DEIN PULSE SCORE</p>
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 180 180">
+              <circle cx="90" cy="90" r="78" fill="none" stroke="var(--mist)" stroke-width="13" />
+              <circle cx="90" cy="90" r="78" fill="none" stroke="var(--pine)" stroke-width="13"
+                stroke-linecap="round" transform="rotate(-90 90 90)"
+                stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" />
+            </svg>
+            <div class="gauge-center">
+              <div class="num">${scores.pulse_score}</div>
+              <div class="label">VON 100</div>
+            </div>
+          </div>
+        </div>
+        ${dims.map(([label, value]) => `
+          <div class="metric-row">
+            <div class="top"><span>${label}</span><span class="val">${value}</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${value}%"></div></div>
+          </div>
+        `).join('')}
+        <a class="btn-primary" href="#/home" style="display:block; text-align:center; text-decoration:none; margin-top:24px;">Weiter zum Dashboard →</a>
+        <button class="signout" id="signout-btn" style="margin-top:20px;">Abmelden</button>
+      `;
+      document.getElementById('signout-btn').addEventListener('click', async () => { await supabase.auth.signOut(); });
+    }
+  }
+
+  // ------------------------------------------------------------
   // Platzhalter: Home (nächster Baustein: Pulse-Fragebogen)
   // ------------------------------------------------------------
   function renderHomePlaceholder(session, profile) {
@@ -591,10 +826,10 @@
       <div class="logo"><span class="dot"></span> Vitara</div>
       <div class="placeholder">
         <h2>Willkommen${name} ✓</h2>
-        <p>Der Pulse-Fragebogen kommt als Nächstes.</p>
-        <p class="mono" style="font-size:12px; margin-top:16px;">${session.user.email}</p>
+        <p>Dein Dashboard mit Verlauf und Streak kommt als Nächstes.</p>
       </div>
-      <button class="signout" id="signout-btn">Abmelden</button>
+      <a class="btn-primary" href="#/pulse" style="display:block; text-align:center; text-decoration:none; margin-top:8px;">Nächsten Pulse starten →</a>
+      <button class="signout" id="signout-btn" style="margin-top:20px;">Abmelden</button>
     `;
     document.getElementById('signout-btn').addEventListener('click', async () => {
       await supabase.auth.signOut();
