@@ -254,6 +254,48 @@
     padding:10px 16px; border-radius:10px; cursor:pointer;
   }
   .btn-signout:hover{ opacity:0.9; }
+
+  /* ---------- Quick profile panel ---------- */
+  .profile-panel-backdrop{
+    display:none; position:fixed; inset:0; z-index:60; background:transparent;
+  }
+  .profile-panel{
+    display:none; position:fixed; top:74px; right:20px; z-index:61;
+    width:360px; max-width:calc(100vw - 40px); max-height:calc(100vh - 100px);
+    overflow-y:auto; background:var(--paper-dim); border:1px solid var(--mist-line);
+    border-radius:18px; padding:22px 22px 26px; box-shadow:0 20px 45px -20px rgba(19,34,26,0.35);
+  }
+  .panel-header{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; }
+  .panel-header strong{ font-size:15.5px; }
+  .panel-header p{ font-size:12.5px; color:#7a8279; margin-top:2px; }
+  .panel-close{
+    background:none; border:none; font-size:18px; color:#7a8279; cursor:pointer;
+    line-height:1; padding:2px 4px;
+  }
+  .panel-section-title{
+    font-size:12.5px; font-weight:600; letter-spacing:0.03em; text-transform:uppercase;
+    color:#7a8279; margin:20px 0 10px;
+  }
+  .panel-section-title:first-of-type{ margin-top:0; }
+
+  .profile-stats-header{ display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+  .profile-avatar-lg{
+    width:56px; height:56px; border-radius:50%; flex:0 0 auto;
+    background:linear-gradient(135deg, var(--pine), var(--pine-dim));
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    font-family:"Fraunces", serif; font-weight:600; font-size:22px;
+  }
+  .profile-name-block strong{ font-size:16px; }
+  .profile-name-block p{ font-size:12px; color:#7a8279; margin-top:2px; }
+
+  .profile-stats-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:4px; }
+  .stat-tile{
+    display:flex; align-items:center; gap:10px;
+    background:var(--paper); border:1px solid var(--mist-line); border-radius:12px; padding:10px 12px;
+  }
+  .stat-tile .stat-icon{ font-size:18px; line-height:1; }
+  .stat-tile .stat-value{ font-family:"Fraunces", serif; font-weight:600; font-size:16px; line-height:1.1; }
+  .stat-tile .stat-label{ font-size:10.5px; color:#7a8279; margin-top:1px; }
 </style>
 </head>
 <body class="centered">
@@ -268,9 +310,11 @@
       <a href="#/mission" data-path="/mission">Mission</a>
       <a href="#/faq" data-path="/faq">FAQ</a>
     </div>
-    <a href="#/profile" class="app-nav-avatar" id="global-profile-nav">?</a>
+    <button type="button" class="app-nav-avatar" id="global-profile-nav">?</button>
   </div>
 </nav>
+<div class="profile-panel-backdrop" id="profile-panel-backdrop"></div>
+<div class="profile-panel" id="profile-panel"></div>
 <div class="content-wrap">
   <div id="app" class="card"></div>
 </div>
@@ -297,13 +341,16 @@
     '/pulse': renderPulse,
     '/insights': renderInsights,
     '/mission': renderMission,
-    '/profile': renderProfile,
     '/faq': renderFAQ,
   };
+
+  let currentSession = null;
 
   async function router() {
     const path = location.hash.slice(1) || '/login';
     const { data: { session } } = await supabase.auth.getSession();
+    currentSession = session;
+    closeProfilePanel();
     const navEl = document.getElementById('app-nav');
     const avatarEl = document.getElementById('global-profile-nav');
 
@@ -361,6 +408,33 @@
   window.addEventListener('hashchange', router);
   window.addEventListener('DOMContentLoaded', router);
   supabase.auth.onAuthStateChange(() => router());
+
+  // ------------------------------------------------------------
+  // Schnellmenü Profil: öffnet als Panel neben dem Avatar,
+  // keine eigene Seite/Route.
+  // ------------------------------------------------------------
+  function openProfilePanel() {
+    document.getElementById('profile-panel').style.display = 'block';
+    document.getElementById('profile-panel-backdrop').style.display = 'block';
+    if (currentSession) renderProfilePanel(currentSession);
+  }
+  function closeProfilePanel() {
+    const panel = document.getElementById('profile-panel');
+    const backdrop = document.getElementById('profile-panel-backdrop');
+    if (panel) panel.style.display = 'none';
+    if (backdrop) backdrop.style.display = 'none';
+  }
+  function isProfilePanelOpen() {
+    const panel = document.getElementById('profile-panel');
+    return panel && panel.style.display === 'block';
+  }
+
+  document.getElementById('global-profile-nav').addEventListener('click', () => {
+    if (isProfilePanelOpen()) closeProfilePanel();
+    else openProfilePanel();
+  });
+  document.getElementById('profile-panel-backdrop').addEventListener('click', closeProfilePanel);
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeProfilePanel(); });
 
   // ------------------------------------------------------------
   // Seite: Login / Registrierung
@@ -780,9 +854,9 @@
       `).join('')}
     `;
   }
-  async function renderProfile(session) {
-    app.classList.add('wide');
-    app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Profil wird geladen …</p>`;
+  async function renderProfilePanel(session) {
+    const panel = document.getElementById('profile-panel');
+    panel.innerHTML = `<p class="step-sub">Wird geladen …</p>`;
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -791,17 +865,62 @@
       .single();
 
     if (profileError || !profile) {
-      app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="msg err">Fehler: ${escapeHtml(profileError?.message || 'Profil nicht gefunden.')}</p>`;
+      panel.innerHTML = `<p class="msg err">Fehler: ${escapeHtml(profileError?.message || 'Profil nicht gefunden.')}</p>`;
       return;
     }
 
+    const { data: pulseStats } = await supabase
+      .from('pulse_sessions')
+      .select('pulse_score')
+      .eq('user_id', session.user.id)
+      .eq('completed', true);
+
+    const totalPulses = pulseStats?.length || 0;
+    const avgScore = totalPulses > 0
+      ? Math.round(pulseStats.reduce((sum, s) => sum + s.pulse_score, 0) / totalPulses)
+      : '–';
+    const joinedLabel = profile.created_at
+      ? new Date(profile.created_at).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+      : '';
+
     const currentGoals = Array.isArray(profile.primary_goal) ? profile.primary_goal : [];
 
-    app.innerHTML = `
-      <div class="logo"><span class="dot"></span> Vitara</div>
-      <h2 class="step-title">Dein Profil</h2>
-      <p class="step-sub">Status: ${profile.premium ? 'Premium' : 'Free'} · ${escapeHtml(session.user.email)}</p>
+    panel.innerHTML = `
+      <div class="panel-header">
+        <div>
+          <strong>${escapeHtml(profile.first_name || 'Dein Profil')}</strong>
+          <p>${profile.premium ? 'Premium' : 'Free'} · ${escapeHtml(session.user.email)}</p>
+        </div>
+        <button type="button" class="panel-close" id="panel-close-btn">✕</button>
+      </div>
 
+      <div class="profile-stats-header">
+        <div class="profile-avatar-lg">${escapeHtml((profile.first_name || session.user.email || '?').trim().charAt(0).toUpperCase())}</div>
+        <div class="profile-name-block">
+          <strong>${escapeHtml(profile.first_name || 'Deine Reise')}</strong>
+          ${joinedLabel ? `<p>Dabei seit ${joinedLabel}</p>` : ''}
+        </div>
+      </div>
+      <div class="profile-stats-grid">
+        <div class="stat-tile">
+          <span class="stat-icon">🔥</span>
+          <div><div class="stat-value">${profile.current_streak ?? 0}</div><div class="stat-label">Streak-Wochen</div></div>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-icon">🏆</span>
+          <div><div class="stat-value">${profile.longest_streak ?? 0}</div><div class="stat-label">Bestwert</div></div>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-icon">📊</span>
+          <div><div class="stat-value">${totalPulses}</div><div class="stat-label">Pulses gesamt</div></div>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-icon">⭐</span>
+          <div><div class="stat-value">${avgScore}</div><div class="stat-label">Ø Pulse Score</div></div>
+        </div>
+      </div>
+
+      <p class="panel-section-title">Deine Daten</p>
       <form id="profile-form">
         <div class="row-2">
           <div>
@@ -860,33 +979,76 @@
         <p class="msg" id="profile-msg" role="status"></p>
       </form>
 
-      <div style="margin-top:28px; border-top:1px solid var(--mist-line); padding-top:20px;">
-        <h3 style="font-size:15px;">Deine Daten</h3>
-        <p style="font-size:13px; color:#7a8279; margin-top:4px;">Lade alle deine Vitara-Daten als Datei herunter.</p>
-        <button type="button" class="link-btn" id="export-btn" style="padding-left:0; margin-top:6px;">Meine Daten exportieren (JSON)</button>
-        <p class="msg" id="export-msg" role="status"></p>
+      <p class="panel-section-title">Abo</p>
+      <div style="background:var(--paper); border:1px solid var(--mist-line); border-radius:12px; padding:14px 16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong style="font-size:14px;">${profile.premium ? 'Premium' : 'Free'}</strong>
+          ${profile.premium ? '<span class="streak-badge" style="margin-top:0; padding:4px 10px; font-size:12px;">Aktiv</span>' : ''}
+        </div>
+        ${profile.premium ? `
+          <p style="font-size:12.5px; color:#7a8279; margin-top:8px;">Du hast Zugriff auf Funktionelle Medizin, Longevity und Biohacking Perspektiven.</p>
+          <button type="button" class="link-btn" id="cancel-premium-btn" style="color:var(--error); padding-left:0; margin-top:8px;">Abo kündigen</button>
+        ` : `
+          <p style="font-size:12.5px; color:#7a8279; margin-top:8px;">Premium schaltet drei tiefere Perspektiven pro Insight frei: Funktionelle Medizin, Longevity, Biohacking.</p>
+          <button type="button" class="link-btn" id="upgrade-premium-btn" style="padding-left:0; margin-top:8px;">Zu Premium wechseln</button>
+        `}
+        <p style="font-size:11px; color:#9aa39c; margin-top:8px;">Echte Zahlungsabwicklung folgt später — hier wird aktuell nur der Plan-Status gesetzt.</p>
+        <p class="msg" id="plan-msg" role="status"></p>
       </div>
 
-      <div class="signout-box">
+      <p class="panel-section-title">Anmeldedaten</p>
+      <label for="account-email">E-Mail-Adresse</label>
+      <input type="email" id="account-email" value="${escapeAttr(session.user.email)}" />
+      <button type="button" class="link-btn" id="change-email-btn" style="padding-left:0; margin-top:6px;">E-Mail ändern</button>
+      <p class="msg" id="email-msg" role="status"></p>
+
+      <label for="account-password" style="display:block; margin-top:14px;">Neues Passwort</label>
+      <input type="password" id="account-password" minlength="6" placeholder="Mind. 6 Zeichen" />
+      <button type="button" class="link-btn" id="change-password-btn" style="padding-left:0; margin-top:6px;">Passwort ändern</button>
+      <p class="msg" id="password-msg" role="status"></p>
+
+      <p class="panel-section-title">Deine Daten exportieren</p>
+      <button type="button" class="link-btn" id="export-btn" style="padding-left:0;">Als JSON herunterladen</button>
+      <p class="msg" id="export-msg" role="status"></p>
+
+      <p class="panel-section-title" style="color:var(--error);">Gefahrenzone</p>
+      <p style="font-size:12.5px; color:#7a8279;">Löscht dein Profil und alle Daten unwiderruflich.</p>
+      <button type="button" class="link-btn" id="show-delete-btn" style="color:var(--error); padding-left:0; margin-top:6px;">Profil löschen</button>
+      <div id="delete-confirm-area" style="display:none; margin-top:12px;">
+        <label for="delete-confirm-input">Tippe <strong>LÖSCHEN</strong> ein, um zu bestätigen</label>
+        <input type="text" id="delete-confirm-input" autocomplete="off" />
+        <button type="button" class="btn-primary" id="delete-confirm-btn" style="background:var(--error); margin-top:10px;" disabled>Profil endgültig löschen</button>
+        <p class="msg" id="delete-msg" role="status"></p>
+      </div>
+
+      <div class="signout-box" style="margin-top:22px;">
         <div>
           <strong>Abmelden</strong>
           <p>Meldet dich von diesem Gerät ab.</p>
         </div>
-        <button type="button" class="btn-signout" id="signout-btn">Abmelden</button>
-      </div>
-
-      <div style="margin-top:20px; border-top:1px solid var(--mist-line); padding-top:20px;">
-        <h3 style="font-size:15px; color:var(--error);">Gefahrenzone</h3>
-        <p style="font-size:13px; color:#7a8279; margin-top:4px;">Löscht dein Konto und alle Daten unwiderruflich. Das kann nicht rückgängig gemacht werden.</p>
-        <button type="button" class="link-btn" id="show-delete-btn" style="color:var(--error); padding-left:0; margin-top:6px;">Konto endgültig löschen</button>
-        <div id="delete-confirm-area" style="display:none; margin-top:12px;">
-          <label for="delete-confirm-input">Tippe <strong>LÖSCHEN</strong> ein, um zu bestätigen</label>
-          <input type="text" id="delete-confirm-input" autocomplete="off" />
-          <button type="button" class="btn-primary" id="delete-confirm-btn" style="background:var(--error); margin-top:10px;" disabled>Konto endgültig löschen</button>
-          <p class="msg" id="delete-msg" role="status"></p>
-        </div>
+        <button type="button" class="btn-signout" id="panel-signout-btn">Abmelden</button>
       </div>
     `;
+
+    document.getElementById('panel-close-btn').addEventListener('click', closeProfilePanel);
+
+    // Abo: Plan-Status umschalten (Platzhalter bis Stripe angebunden ist)
+    document.getElementById('upgrade-premium-btn')?.addEventListener('click', async () => {
+      const msg = document.getElementById('plan-msg');
+      msg.textContent = 'Wird umgestellt …';
+      msg.className = 'msg';
+      const { error } = await supabase.from('profiles').update({ premium: true }).eq('id', session.user.id);
+      if (error) { msg.textContent = 'Fehler: ' + error.message; msg.className = 'msg err'; return; }
+      renderProfilePanel(session);
+    });
+    document.getElementById('cancel-premium-btn')?.addEventListener('click', async () => {
+      const msg = document.getElementById('plan-msg');
+      msg.textContent = 'Wird gekündigt …';
+      msg.className = 'msg';
+      const { error } = await supabase.from('profiles').update({ premium: false }).eq('id', session.user.id);
+      if (error) { msg.textContent = 'Fehler: ' + error.message; msg.className = 'msg err'; return; }
+      renderProfilePanel(session);
+    });
 
     // Ziel-Auswahl (max. 3, wie im Onboarding)
     const goalGrid = document.getElementById('profile-goal-grid');
@@ -931,6 +1093,53 @@
       }
       msg.textContent = 'Gespeichert.';
       msg.className = 'msg ok';
+      // Avatar-Buchstabe im Nav ggf. aktualisieren
+      const avatarEl = document.getElementById('global-profile-nav');
+      const newName = document.getElementById('first_name').value.trim();
+      if (avatarEl && newName) avatarEl.textContent = newName.charAt(0).toUpperCase();
+    });
+
+    // Anmeldedaten: E-Mail ändern
+    document.getElementById('change-email-btn').addEventListener('click', async () => {
+      const msg = document.getElementById('email-msg');
+      const newEmail = document.getElementById('account-email').value.trim();
+      if (!newEmail) return;
+      msg.textContent = 'Wird geändert …';
+      msg.className = 'msg';
+
+      const { error } = await supabase.auth.updateUser({ email: newEmail });
+
+      if (error) {
+        msg.textContent = 'Fehler: ' + error.message;
+        msg.className = 'msg err';
+        return;
+      }
+      msg.textContent = 'Falls eine Bestätigung nötig ist, wurde dir eine E-Mail geschickt.';
+      msg.className = 'msg ok';
+    });
+
+    // Anmeldedaten: Passwort ändern
+    document.getElementById('change-password-btn').addEventListener('click', async () => {
+      const msg = document.getElementById('password-msg');
+      const newPassword = document.getElementById('account-password').value;
+      if (!newPassword || newPassword.length < 6) {
+        msg.textContent = 'Das Passwort muss mindestens 6 Zeichen haben.';
+        msg.className = 'msg err';
+        return;
+      }
+      msg.textContent = 'Wird geändert …';
+      msg.className = 'msg';
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        msg.textContent = 'Fehler: ' + error.message;
+        msg.className = 'msg err';
+        return;
+      }
+      msg.textContent = 'Passwort geändert.';
+      msg.className = 'msg ok';
+      document.getElementById('account-password').value = '';
     });
 
     // Datenexport
@@ -965,7 +1174,7 @@
       msg.className = 'msg ok';
     });
 
-    // Konto löschen
+    // Profil löschen
     document.getElementById('show-delete-btn').addEventListener('click', () => {
       document.getElementById('delete-confirm-area').style.display = 'block';
     });
@@ -979,7 +1188,7 @@
     confirmBtn.addEventListener('click', async () => {
       const msg = document.getElementById('delete-msg');
       confirmBtn.disabled = true;
-      msg.textContent = 'Konto wird gelöscht …';
+      msg.textContent = 'Profil wird gelöscht …';
       msg.className = 'msg';
 
       const { error } = await supabase.rpc('delete_my_account');
@@ -991,10 +1200,14 @@
         return;
       }
 
+      closeProfilePanel();
       await supabase.auth.signOut();
     });
 
-    document.getElementById('signout-btn').addEventListener('click', async () => { await supabase.auth.signOut(); });
+    document.getElementById('panel-signout-btn').addEventListener('click', async () => {
+      closeProfilePanel();
+      await supabase.auth.signOut();
+    });
   }
 
   // ------------------------------------------------------------
