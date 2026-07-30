@@ -183,6 +183,27 @@
   .history-row{ margin-top:14px; }
   .history-row .top{ display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:6px; color:#4a5148; }
   .dash-links{ display:flex; flex-direction:column; gap:8px; margin-top:20px; }
+
+  /* ---------- Mission page ---------- */
+  .mission-hero{
+    background:var(--pine-dim); color:var(--paper);
+    border-radius:18px; padding:26px 24px; margin-top:20px; text-align:left;
+  }
+  .mission-hero-tag{
+    display:inline-block; font-family:"IBM Plex Mono", monospace; font-size:11px; letter-spacing:0.06em;
+    color:#9fcbb2; border:1px solid rgba(245,243,238,0.25); border-radius:999px; padding:4px 10px;
+  }
+  .mission-hero h2{ color:var(--paper); font-size:20px; margin-top:12px; }
+  .mission-hero p{ color:#D7E4DC; font-size:14px; margin-top:10px; line-height:1.55; }
+  .mission-hero .mission-action{ color:var(--paper); margin-top:14px; }
+  .mission-meta{ display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .mission-meta span{
+    font-size:12px; background:rgba(245,243,238,0.12); border-radius:999px; padding:5px 10px;
+  }
+  .mission-safety{
+    margin-top:14px; font-size:12.5px; color:#F3D9B1;
+    border-top:1px solid rgba(245,243,238,0.18); padding-top:12px;
+  }
 </style>
 </head>
 <body>
@@ -210,6 +231,7 @@
     '/home': renderHomePlaceholder,
     '/pulse': renderPulse,
     '/insights': renderInsights,
+    '/mission': renderMission,
   };
 
   async function router() {
@@ -910,7 +932,7 @@
       <h2 class="step-title">Deine Erkenntnisse</h2>
       <p class="step-sub">Pulse vom ${dateLabel} · Score ${latestSession.pulse_score}</p>
       ${order.map(key => renderInsightCard(insights[key])).join('')}
-      <a class="btn-primary" href="#/home" style="display:block; text-align:center; text-decoration:none; margin-top:24px;">Weiter zum Dashboard →</a>
+      <a class="btn-primary" href="#/mission" style="display:block; text-align:center; text-decoration:none; margin-top:24px;">Deine Mission ansehen →</a>
       <button class="signout" id="signout-btn" style="margin-top:20px;">Abmelden</button>
     `;
     document.getElementById('signout-btn').addEventListener('click', async () => { await supabase.auth.signOut(); });
@@ -961,6 +983,96 @@
       </div>
     `;
   }
+
+  // ------------------------------------------------------------
+  // Seite: Mission — eine Handlungsempfehlung statt fünf
+  // ------------------------------------------------------------
+  const DIFFICULTY_LABELS = { easy: 'Einfach', medium: 'Mittel', advanced: 'Anspruchsvoll' };
+
+  async function renderMission(session) {
+    app.classList.add('wide');
+    app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Deine Mission wird ausgewählt …</p>`;
+
+    const { data: latestSession, error: sessionError } = await supabase
+      .from('pulse_sessions')
+      .select('id, energy_score, recovery_score, performance_score, resilience_score, longevity_score')
+      .eq('user_id', session.user.id)
+      .eq('completed', true)
+      .order('pulse_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (sessionError || !latestSession) {
+      app.innerHTML = `
+        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="placeholder"><p>Mach zuerst deinen ersten Pulse, dann zeigen wir dir hier deine Mission.</p></div>
+        <a class="btn-primary" href="#/pulse" style="display:block; text-align:center; text-decoration:none; margin-top:8px;">Ersten Pulse starten →</a>
+      `;
+      return;
+    }
+
+    const { data: insights, error: insightsError } = await supabase.rpc('get_all_pulse_insights', {
+      p_session_id: latestSession.id,
+    });
+
+    if (insightsError) {
+      app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="msg err">Fehler: ${escapeHtml(insightsError.message)}</p>`;
+      return;
+    }
+
+    // Dimensionen nach Score aufsteigend sortieren — der größte Hebel zuerst
+    const scored = [
+      ['Energy', latestSession.energy_score, insights.energy],
+      ['Recovery', latestSession.recovery_score, insights.recovery],
+      ['Performance', latestSession.performance_score, insights.performance],
+      ['Resilience', latestSession.resilience_score, insights.resilience],
+      ['Longevity', latestSession.longevity_score, insights.longevity],
+    ].sort((a, b) => a[1] - b[1]);
+
+    // Erste Dimension mit tatsächlich verfügbarer Mission finden
+    let chosen = null;
+    for (const [category, score, insight] of scored) {
+      const missions = insight?.free_insight?.missions || [];
+      if (missions.length > 0) {
+        chosen = { category, score, mission: missions[0] };
+        break;
+      }
+    }
+
+    if (!chosen) {
+      app.innerHTML = `
+        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="placeholder"><p>Für diesen Pulse ist aktuell keine Mission hinterlegt.</p></div>
+        <a class="btn-primary" href="#/home" style="display:block; text-align:center; text-decoration:none; margin-top:8px;">Weiter zum Dashboard →</a>
+      `;
+      return;
+    }
+
+    const { category, score, mission } = chosen;
+
+    app.innerHTML = `
+      <div class="logo"><span class="dot"></span> Vitara</div>
+      <p class="mono" style="font-size:11.5px; color:#7a8279;">DEINE MISSION BIS ZUM NÄCHSTEN PULSE</p>
+      <p class="step-sub">Dein ${category}-Score liegt aktuell bei ${score} — hier lohnt sich gerade der größte Hebel.</p>
+
+      <div class="mission-hero">
+        <span class="mission-hero-tag">${category}</span>
+        <h2>${escapeHtml(mission.title)}</h2>
+        <p>${escapeHtml(mission.description)}</p>
+        <p class="mission-action"><strong>Deine Aufgabe:</strong> ${escapeHtml(mission.action_text)}</p>
+        <div class="mission-meta">
+          ${mission.duration_days ? `<span>${mission.duration_days} Tage</span>` : ''}
+          ${mission.difficulty ? `<span>${DIFFICULTY_LABELS[mission.difficulty] || mission.difficulty}</span>` : ''}
+        </div>
+        ${mission.safety_note ? `<div class="mission-safety">⚠ ${escapeHtml(mission.safety_note)}</div>` : ''}
+      </div>
+
+      <a class="btn-primary" href="#/home" style="display:block; text-align:center; text-decoration:none; margin-top:24px;">Weiter zum Dashboard →</a>
+      <button class="signout" id="signout-btn" style="margin-top:20px;">Abmelden</button>
+    `;
+    document.getElementById('signout-btn').addEventListener('click', async () => { await supabase.auth.signOut(); });
+  }
+
   function renderHomePlaceholder(session, profile) {
     renderHome(session, profile);
   }
