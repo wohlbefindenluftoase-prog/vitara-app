@@ -302,7 +302,9 @@
       height_cm: profile?.height_cm || '',
       weight_kg: profile?.weight_kg || '',
       activity_level: profile?.activity_level || '',
-      primary_goal: profile?.primary_goal ?? '',
+      primary_goal: Array.isArray(profile?.primary_goal)
+        ? profile.primary_goal
+        : (profile?.primary_goal ? [profile.primary_goal] : []),
     };
 
     const steps = ['welcome', 'basics', 'body', 'activity', 'goal', 'done'];
@@ -344,15 +346,19 @@
         </div>
       `;
       if (step === 'activity') return renderChoiceGrid('activity_level', ACTIVITY_OPTIONS, data.activity_level);
-      if (step === 'goal') return renderChoiceGrid('primary_goal', GOAL_OPTIONS, data.primary_goal);
+      if (step === 'goal') return renderChoiceGrid('primary_goal', GOAL_OPTIONS, data.primary_goal, { multi: true, max: 3 });
       return '';
     }
 
-    function renderChoiceGrid(fieldId, options, selected) {
+    function renderChoiceGrid(fieldId, options, selected, config = {}) {
+      const { multi = false, max = null } = config;
+      const selectedArr = multi ? (Array.isArray(selected) ? selected : []) : null;
       return `
-        <div class="choice-grid" id="${fieldId}-grid" data-field="${fieldId}">
+        <div class="choice-grid" id="${fieldId}-grid" data-field="${fieldId}" data-multi="${multi}" data-max="${max || ''}">
           ${options.map(opt => `
-            <button type="button" class="choice-card ${opt.value === selected ? 'selected' : ''}" data-value="${escapeAttr(opt.value)}">
+            <button type="button"
+              class="choice-card ${multi ? (selectedArr.includes(opt.value) ? 'selected' : '') : (opt.value === selected ? 'selected' : '')}"
+              data-value="${escapeAttr(opt.value)}">
               <div class="title">${opt.title}</div>
               <div class="sub">${opt.sub}</div>
             </button>
@@ -380,7 +386,7 @@
       },
       goal: {
         title: 'Worauf möchtest du dich zuerst konzentrieren?',
-        sub: 'Das macht deine ersten Erkenntnisse gezielter — du kannst das später jederzeit ändern.',
+        sub: 'Wähl bis zu 3 aus — das macht deine ersten Erkenntnisse gezielter. Du kannst das später jederzeit ändern.',
       },
     };
 
@@ -414,14 +420,54 @@
           </div>
           ${isOptionalStep ? '<button type="button" class="link-btn" id="skip-btn" style="margin-top:8px;">Überspringen</button>' : ''}
         </form>
+        <button class="signout" id="signout-btn" style="margin-top:20px;">Abmelden</button>
       `;
 
-      // Auswahlkarten (activity/goal) klickbar machen
-      app.querySelectorAll('.choice-card').forEach(card => {
-        card.addEventListener('click', () => {
-          const grid = card.closest('.choice-grid');
-          grid.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
-          card.classList.add('selected');
+      document.getElementById('signout-btn').addEventListener('click', async () => {
+        await supabase.auth.signOut();
+      });
+
+      // Auswahlkarten klickbar machen — Einzel- oder Mehrfachauswahl je Grid
+      app.querySelectorAll('.choice-grid').forEach(grid => {
+        const isMulti = grid.dataset.multi === 'true';
+        const max = grid.dataset.max ? parseInt(grid.dataset.max, 10) : null;
+
+        grid.querySelectorAll('.choice-card').forEach(card => {
+          card.addEventListener('click', () => {
+            if (!isMulti) {
+              grid.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
+              card.classList.add('selected');
+              return;
+            }
+
+            const isUnclear = card.dataset.value === '';
+
+            if (isUnclear) {
+              grid.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
+              card.classList.add('selected');
+              return;
+            }
+
+            // "Noch unklar" abwählen, sobald ein echtes Ziel gewählt wird
+            const unclearCard = grid.querySelector('.choice-card[data-value=""]');
+            unclearCard?.classList.remove('selected');
+
+            if (card.classList.contains('selected')) {
+              card.classList.remove('selected');
+              return;
+            }
+
+            const currentlySelected = grid.querySelectorAll('.choice-card.selected').length;
+            if (max && currentlySelected >= max) {
+              card.animate(
+                [{ transform: 'scale(1)' }, { transform: 'scale(0.97)' }, { transform: 'scale(1)' }],
+                { duration: 180 }
+              );
+              return;
+            }
+
+            card.classList.add('selected');
+          });
         });
       });
 
@@ -489,21 +535,30 @@
         data.activity_level = selected ? selected.dataset.value : null;
       }
       if (step === 'goal') {
-        const selected = document.querySelector('#primary_goal-grid .choice-card.selected');
-        data.primary_goal = selected ? selected.dataset.value : null;
+        const selected = Array.from(document.querySelectorAll('#primary_goal-grid .choice-card.selected'))
+          .map(c => c.dataset.value);
+        data.primary_goal = selected.length ? selected : null;
       }
     }
 
     async function renderDone() {
-      const goalLabel = GOAL_OPTIONS.find(g => g.value === data.primary_goal)?.title || 'deine Gesundheit';
+      const goalLabels = (Array.isArray(data.primary_goal) ? data.primary_goal : [])
+        .map(v => GOAL_OPTIONS.find(g => g.value === v)?.title)
+        .filter(Boolean);
+      const goalText = goalLabels.length ? goalLabels.join(', ') : 'deine Gesundheit';
       app.innerHTML = `
         <div class="logo"><span class="dot"></span> Vitara</div>
         <div class="placeholder">
           <h2>Alles bereit${data.first_name ? ', ' + escapeHtml(data.first_name) : ''}.</h2>
-          <p>Dein erster Pulse dauert nur etwa 10 Minuten und gibt dir ein erstes Bild zu <strong>${escapeHtml(goalLabel)}</strong> — und den anderen vier Dimensionen gleich mit.</p>
+          <p>Dein erster Pulse dauert nur etwa 10 Minuten und gibt dir ein erstes Bild zu <strong>${escapeHtml(goalText)}</strong> — und den anderen Dimensionen gleich mit.</p>
         </div>
         <button class="btn-primary" id="start-pulse-btn" style="margin-top:8px;">Ersten Pulse starten →</button>
+        <button class="signout" id="signout-btn" style="margin-top:20px;">Abmelden</button>
       `;
+
+      document.getElementById('signout-btn').addEventListener('click', async () => {
+        await supabase.auth.signOut();
+      });
 
       document.getElementById('start-pulse-btn').addEventListener('click', async () => {
         const btn = document.getElementById('start-pulse-btn');
