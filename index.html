@@ -321,11 +321,11 @@
     const data = {
       first_name: profile?.first_name || '',
       last_name: profile?.last_name || '',
-      birthday: profile?.birthday || '',
-      gender: profile?.gender || '',
-      height_cm: profile?.height_cm || '',
-      weight_kg: profile?.weight_kg || '',
-      activity_level: profile?.activity_level || '',
+      birthday: profile?.birthday || null,
+      gender: profile?.gender || null,
+      height_cm: profile?.height_cm ?? null,
+      weight_kg: profile?.weight_kg ?? null,
+      activity_level: profile?.activity_level || null,
       primary_goal: Array.isArray(profile?.primary_goal)
         ? profile.primary_goal
         : (profile?.primary_goal ? [profile.primary_goal] : []),
@@ -349,7 +349,7 @@
           <div>
             <label for="gender">Geschlecht (optional)</label>
             <select id="gender">
-              <option value="" ${data.gender === '' ? 'selected' : ''}>Keine Angabe</option>
+              <option value="" ${!data.gender ? 'selected' : ''}>Keine Angabe</option>
               <option value="weiblich" ${data.gender === 'weiblich' ? 'selected' : ''}>Weiblich</option>
               <option value="männlich" ${data.gender === 'männlich' ? 'selected' : ''}>Männlich</option>
               <option value="divers" ${data.gender === 'divers' ? 'selected' : ''}>Divers</option>
