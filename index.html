@@ -232,6 +232,7 @@
     '/pulse': renderPulse,
     '/insights': renderInsights,
     '/mission': renderMission,
+    '/profile': renderProfile,
   };
 
   async function router() {
@@ -667,6 +668,223 @@
     const div = document.createElement('div');
     div.textContent = String(value ?? '');
     return div.innerHTML;
+  }
+
+  // ------------------------------------------------------------
+  // Seite: Profil
+  // ------------------------------------------------------------
+  async function renderProfile(session) {
+    app.classList.add('wide');
+    app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Profil wird geladen …</p>`;
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="msg err">Fehler: ${escapeHtml(profileError?.message || 'Profil nicht gefunden.')}</p>`;
+      return;
+    }
+
+    const currentGoals = Array.isArray(profile.primary_goal) ? profile.primary_goal : [];
+
+    app.innerHTML = `
+      <div class="logo"><span class="dot"></span> Vitara</div>
+      <h2 class="step-title">Dein Profil</h2>
+      <p class="step-sub">Status: ${profile.premium ? 'Premium' : 'Free'} · ${escapeHtml(session.user.email)}</p>
+
+      <form id="profile-form">
+        <div class="row-2">
+          <div>
+            <label for="first_name">Vorname</label>
+            <input type="text" id="first_name" value="${escapeAttr(profile.first_name)}" />
+          </div>
+          <div>
+            <label for="last_name">Nachname</label>
+            <input type="text" id="last_name" value="${escapeAttr(profile.last_name)}" />
+          </div>
+        </div>
+        <div class="row-2">
+          <div>
+            <label for="birthday">Geburtsdatum</label>
+            <input type="date" id="birthday" value="${escapeAttr(profile.birthday)}" />
+          </div>
+          <div>
+            <label for="gender">Geschlecht</label>
+            <select id="gender">
+              <option value="" ${!profile.gender ? 'selected' : ''}>Keine Angabe</option>
+              <option value="weiblich" ${profile.gender === 'weiblich' ? 'selected' : ''}>Weiblich</option>
+              <option value="männlich" ${profile.gender === 'männlich' ? 'selected' : ''}>Männlich</option>
+              <option value="divers" ${profile.gender === 'divers' ? 'selected' : ''}>Divers</option>
+            </select>
+          </div>
+        </div>
+        <div class="row-2">
+          <div>
+            <label for="height_cm">Größe (cm)</label>
+            <input type="number" id="height_cm" min="100" max="250" value="${escapeAttr(profile.height_cm)}" />
+          </div>
+          <div>
+            <label for="weight_kg">Gewicht (kg)</label>
+            <input type="number" id="weight_kg" min="30" max="300" step="0.1" value="${escapeAttr(profile.weight_kg)}" />
+          </div>
+        </div>
+        <div>
+          <label for="activity_level">Aktivitätslevel</label>
+          <select id="activity_level">
+            <option value="" ${!profile.activity_level ? 'selected' : ''}>Keine Angabe</option>
+            ${ACTIVITY_OPTIONS.map(o => `<option value="${o.value}" ${profile.activity_level === o.value ? 'selected' : ''}>${o.title}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label>Deine Ziele (bis zu 3)</label>
+          <div class="choice-grid" id="profile-goal-grid">
+            ${GOAL_OPTIONS.map(o => `
+              <button type="button" class="choice-card ${currentGoals.includes(o.value) ? 'selected' : ''}" data-value="${escapeAttr(o.value)}">
+                <div class="title">${o.title}</div>
+                <div class="sub">${o.sub}</div>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+        <button type="submit" class="btn-primary">Speichern</button>
+        <p class="msg" id="profile-msg" role="status"></p>
+      </form>
+
+      <div style="margin-top:28px; border-top:1px solid var(--mist-line); padding-top:20px;">
+        <h3 style="font-size:15px;">Deine Daten</h3>
+        <p style="font-size:13px; color:#7a8279; margin-top:4px;">Lade alle deine Vitara-Daten als Datei herunter.</p>
+        <button type="button" class="link-btn" id="export-btn" style="padding-left:0; margin-top:6px;">Meine Daten exportieren (JSON)</button>
+        <p class="msg" id="export-msg" role="status"></p>
+      </div>
+
+      <div style="margin-top:20px; border-top:1px solid var(--mist-line); padding-top:20px;">
+        <h3 style="font-size:15px; color:var(--error);">Gefahrenzone</h3>
+        <p style="font-size:13px; color:#7a8279; margin-top:4px;">Löscht dein Konto und alle Daten unwiderruflich. Das kann nicht rückgängig gemacht werden.</p>
+        <button type="button" class="link-btn" id="show-delete-btn" style="color:var(--error); padding-left:0; margin-top:6px;">Konto endgültig löschen</button>
+        <div id="delete-confirm-area" style="display:none; margin-top:12px;">
+          <label for="delete-confirm-input">Tippe <strong>LÖSCHEN</strong> ein, um zu bestätigen</label>
+          <input type="text" id="delete-confirm-input" autocomplete="off" />
+          <button type="button" class="btn-primary" id="delete-confirm-btn" style="background:var(--error); margin-top:10px;" disabled>Konto endgültig löschen</button>
+          <p class="msg" id="delete-msg" role="status"></p>
+        </div>
+      </div>
+
+      <div class="dash-links" style="margin-top:24px;">
+        <a class="link-btn" href="#/home" style="text-align:center;">Zurück zum Dashboard</a>
+      </div>
+      <button class="signout" id="signout-btn" style="margin-top:12px;">Abmelden</button>
+    `;
+
+    // Ziel-Auswahl (max. 3, wie im Onboarding)
+    const goalGrid = document.getElementById('profile-goal-grid');
+    goalGrid.querySelectorAll('.choice-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const currentlySelected = goalGrid.querySelectorAll('.choice-card.selected').length;
+        if (card.classList.contains('selected')) {
+          card.classList.remove('selected');
+          return;
+        }
+        if (currentlySelected >= 3) {
+          card.animate([{ transform: 'scale(1)' }, { transform: 'scale(0.97)' }, { transform: 'scale(1)' }], { duration: 180 });
+          return;
+        }
+        card.classList.add('selected');
+      });
+    });
+
+    document.getElementById('profile-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('profile-msg');
+      msg.textContent = 'Wird gespeichert …';
+      msg.className = 'msg';
+
+      const selectedGoals = Array.from(goalGrid.querySelectorAll('.choice-card.selected')).map(c => c.dataset.value);
+
+      const { error } = await supabase.from('profiles').update({
+        first_name: document.getElementById('first_name').value.trim() || null,
+        last_name: document.getElementById('last_name').value.trim() || null,
+        birthday: document.getElementById('birthday').value || null,
+        gender: document.getElementById('gender').value || null,
+        height_cm: document.getElementById('height_cm').value ? Number(document.getElementById('height_cm').value) : null,
+        weight_kg: document.getElementById('weight_kg').value ? Number(document.getElementById('weight_kg').value) : null,
+        activity_level: document.getElementById('activity_level').value || null,
+        primary_goal: selectedGoals.length ? selectedGoals : null,
+      }).eq('id', session.user.id);
+
+      if (error) {
+        msg.textContent = 'Fehler: ' + error.message;
+        msg.className = 'msg err';
+        return;
+      }
+      msg.textContent = 'Gespeichert.';
+      msg.className = 'msg ok';
+    });
+
+    // Datenexport
+    document.getElementById('export-btn').addEventListener('click', async () => {
+      const msg = document.getElementById('export-msg');
+      msg.textContent = 'Daten werden gesammelt …';
+      msg.className = 'msg';
+
+      const [sessions, answers, achievements] = await Promise.all([
+        supabase.from('pulse_sessions').select('*').eq('user_id', session.user.id),
+        supabase.from('pulse_answers').select('*').eq('user_id', session.user.id),
+        supabase.from('achievements').select('*').eq('user_id', session.user.id),
+      ]);
+
+      const exportData = {
+        exported_at: new Date().toISOString(),
+        profile,
+        pulse_sessions: sessions.data || [],
+        pulse_answers: answers.data || [],
+        achievements: achievements.data || [],
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'vitara-daten-export.json';
+      a.click();
+      URL.revokeObjectURL(url);
+
+      msg.textContent = 'Export heruntergeladen.';
+      msg.className = 'msg ok';
+    });
+
+    // Konto löschen
+    document.getElementById('show-delete-btn').addEventListener('click', () => {
+      document.getElementById('delete-confirm-area').style.display = 'block';
+    });
+
+    const confirmInput = document.getElementById('delete-confirm-input');
+    const confirmBtn = document.getElementById('delete-confirm-btn');
+    confirmInput.addEventListener('input', () => {
+      confirmBtn.disabled = confirmInput.value !== 'LÖSCHEN';
+    });
+
+    confirmBtn.addEventListener('click', async () => {
+      const msg = document.getElementById('delete-msg');
+      confirmBtn.disabled = true;
+      msg.textContent = 'Konto wird gelöscht …';
+      msg.className = 'msg';
+
+      const { error } = await supabase.rpc('delete_my_account');
+
+      if (error) {
+        msg.textContent = 'Fehler: ' + error.message;
+        msg.className = 'msg err';
+        confirmBtn.disabled = false;
+        return;
+      }
+
+      await supabase.auth.signOut();
+    });
+
+    document.getElementById('signout-btn').addEventListener('click', async () => { await supabase.auth.signOut(); });
   }
 
   // ------------------------------------------------------------
@@ -1135,6 +1353,7 @@
       <div class="dash-links">
         <a class="btn-primary" href="#/pulse" style="text-align:center; text-decoration:none;">Nächsten Pulse starten →</a>
         ${latest ? '<a class="link-btn" href="#/insights" style="text-align:center;">Letzte Erkenntnisse ansehen</a>' : ''}
+        <a class="link-btn" href="#/profile" style="text-align:center;">Profil &amp; Einstellungen</a>
       </div>
       <button class="signout" id="signout-btn" style="margin-top:20px;">Abmelden</button>
     `;
