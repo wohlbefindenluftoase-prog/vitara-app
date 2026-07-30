@@ -308,8 +308,6 @@
     const steps = ['welcome', 'basics', 'body', 'activity', 'goal', 'done'];
     let stepIndex = Math.min(profile?.onboarding_step || 0, steps.length - 1);
 
-    renderStep();
-
     // ---------------- Schritt-Templates ----------------
     function fieldsFor(step) {
       if (step === 'welcome') return `
@@ -385,6 +383,8 @@
         sub: 'Das macht deine ersten Erkenntnisse gezielter — du kannst das später jederzeit ändern.',
       },
     };
+
+    renderStep();
 
     function renderStep() {
       const step = steps[stepIndex];
