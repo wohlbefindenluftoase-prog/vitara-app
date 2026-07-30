@@ -142,6 +142,37 @@
   .metric-row .top .val{ font-weight:600; }
   .bar-track{ height:7px; background:var(--mist); border-radius:999px; overflow:hidden; }
   .bar-fill{ height:100%; border-radius:999px; background:linear-gradient(90deg, var(--pine-dim), var(--pine)); }
+
+  /* ---------- Insights page ---------- */
+  .insight-card{
+    text-align:left; border:1px solid var(--mist); border-radius:16px;
+    padding:20px 22px; margin-top:16px; background:var(--paper);
+  }
+  .insight-head{ display:flex; justify-content:space-between; align-items:center; }
+  .insight-head .code{ font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--pine); }
+  .insight-head .score{ font-family:"Fraunces", serif; font-size:20px; font-weight:600; }
+  .insight-card h3{ font-size:17px; margin-top:8px; }
+  .insight-card p{ font-size:14px; color:#4a5148; margin-top:8px; line-height:1.5; }
+  .insight-card .positive{ font-style:italic; color:var(--pine-dim); font-size:13.5px; }
+
+  .mission-item{
+    border-top:1px solid var(--mist-line); padding-top:10px; margin-top:12px;
+  }
+  .mission-item strong{ font-size:13.5px; }
+  .mission-item p{ font-size:13px; color:#586059; margin-top:3px; }
+
+  .premium-perspective{
+    background:var(--paper-dim); border:1px solid var(--mist-line); border-radius:12px;
+    padding:14px 16px; margin-top:12px;
+  }
+  .premium-perspective .perspective-tag{ font-family:"IBM Plex Mono", monospace; font-size:10.5px; letter-spacing:0.05em; color:var(--pine); text-transform:uppercase; }
+  .premium-perspective h4{ font-size:14.5px; font-weight:500; margin-top:6px; }
+  .premium-perspective p{ font-size:13px; color:#586059; margin-top:6px; }
+
+  .premium-teaser{
+    margin-top:14px; font-size:13px; color:#7a8279;
+    border-top:1px solid var(--mist-line); padding-top:12px;
+  }
 </style>
 </head>
 <body>
@@ -168,6 +199,7 @@
     '/onboarding': renderOnboarding,
     '/home': renderHomePlaceholder,
     '/pulse': renderPulse,
+    '/insights': renderInsights,
   };
 
   async function router() {
@@ -809,7 +841,7 @@
             <div class="bar-track"><div class="bar-fill" style="width:${value}%"></div></div>
           </div>
         `).join('')}
-        <a class="btn-primary" href="#/home" style="display:block; text-align:center; text-decoration:none; margin-top:24px;">Weiter zum Dashboard →</a>
+        <a class="btn-primary" href="#/insights" style="display:block; text-align:center; text-decoration:none; margin-top:24px;">Deine Erkenntnisse ansehen →</a>
         <button class="signout" id="signout-btn" style="margin-top:20px;">Abmelden</button>
       `;
       document.getElementById('signout-btn').addEventListener('click', async () => { await supabase.auth.signOut(); });
@@ -817,8 +849,108 @@
   }
 
   // ------------------------------------------------------------
-  // Platzhalter: Home (nächster Baustein: Pulse-Fragebogen)
+  // Seite: Insights
   // ------------------------------------------------------------
+  const CATEGORY_CODES = { Energy: 'EN', Recovery: 'RE', Performance: 'PE', Resilience: 'RS', Longevity: 'LO' };
+  const PERSPECTIVE_LABELS = {
+    functional_medicine: 'Funktionelle Medizin',
+    longevity: 'Longevity',
+    biohacking: 'Biohacking',
+  };
+
+  async function renderInsights(session) {
+    app.classList.add('wide');
+    app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Deine Erkenntnisse werden geladen …</p>`;
+
+    const { data: latestSession, error: sessionError } = await supabase
+      .from('pulse_sessions')
+      .select('id, pulse_date, pulse_score')
+      .eq('user_id', session.user.id)
+      .eq('completed', true)
+      .order('pulse_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (sessionError || !latestSession) {
+      app.innerHTML = `
+        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="placeholder">
+          <h2>Noch kein abgeschlossener Pulse</h2>
+          <p>Mach zuerst deinen ersten Pulse, dann zeigen wir dir hier deine Erkenntnisse.</p>
+        </div>
+        <a class="btn-primary" href="#/pulse" style="display:block; text-align:center; text-decoration:none; margin-top:8px;">Ersten Pulse starten →</a>
+      `;
+      return;
+    }
+
+    const { data: insights, error: insightsError } = await supabase.rpc('get_all_pulse_insights', {
+      p_session_id: latestSession.id,
+    });
+
+    if (insightsError) {
+      app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="msg err">Fehler: ${escapeHtml(insightsError.message)}</p>`;
+      return;
+    }
+
+    const dateLabel = new Date(latestSession.pulse_date).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+    const order = ['energy', 'recovery', 'performance', 'resilience', 'longevity'];
+
+    app.innerHTML = `
+      <div class="logo"><span class="dot"></span> Vitara</div>
+      <h2 class="step-title">Deine Erkenntnisse</h2>
+      <p class="step-sub">Pulse vom ${dateLabel} · Score ${latestSession.pulse_score}</p>
+      ${order.map(key => renderInsightCard(insights[key])).join('')}
+      <a class="btn-primary" href="#/home" style="display:block; text-align:center; text-decoration:none; margin-top:24px;">Weiter zum Dashboard →</a>
+      <button class="signout" id="signout-btn" style="margin-top:20px;">Abmelden</button>
+    `;
+    document.getElementById('signout-btn').addEventListener('click', async () => { await supabase.auth.signOut(); });
+  }
+
+  function renderInsightCard(insight) {
+    if (!insight || !insight.success) {
+      return `
+        <div class="insight-card">
+          <p>Für diesen Bereich haben wir aktuell noch keine passende Erkenntnis hinterlegt.</p>
+        </div>
+      `;
+    }
+
+    const fi = insight.free_insight;
+    const isPremium = insight.membership?.is_premium === true;
+    const premiumInsights = insight.premium_insights || [];
+
+    const missionsHtml = (fi.missions || []).map(m => `
+      <div class="mission-item">
+        <strong>${escapeHtml(m.title)}</strong>
+        <p>${escapeHtml(m.action_text)}</p>
+      </div>
+    `).join('');
+
+    const premiumHtml = isPremium
+      ? premiumInsights.map(pi => `
+          <div class="premium-perspective">
+            <div class="perspective-tag">${escapeHtml(PERSPECTIVE_LABELS[pi.perspective] || pi.perspective)}</div>
+            <h4>${escapeHtml(pi.title)}</h4>
+            <p>${escapeHtml(pi.explanation)}</p>
+            ${pi.next_step ? `<p><strong>Nächster Schritt:</strong> ${escapeHtml(pi.next_step)}</p>` : ''}
+          </div>
+        `).join('')
+      : `<p class="premium-teaser">+ 3 tiefere Perspektiven verfügbar mit Premium (Funktionelle Medizin, Longevity, Biohacking)</p>`;
+
+    return `
+      <div class="insight-card">
+        <div class="insight-head">
+          <span class="code">${CATEGORY_CODES[insight.category] || insight.category}</span>
+          <span class="score">${insight.score}</span>
+        </div>
+        <h3>${escapeHtml(fi.title)}</h3>
+        <p>${escapeHtml(fi.summary)}</p>
+        ${fi.positive_message ? `<p class="positive">${escapeHtml(fi.positive_message)}</p>` : ''}
+        ${missionsHtml}
+        ${premiumHtml}
+      </div>
+    `;
+  }
   function renderHomePlaceholder(session, profile) {
     app.classList.remove('wide');
     const name = profile?.first_name ? `, ${profile.first_name}` : '';
