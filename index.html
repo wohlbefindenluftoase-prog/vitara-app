@@ -173,6 +173,16 @@
     margin-top:14px; font-size:13px; color:#7a8279;
     border-top:1px solid var(--mist-line); padding-top:12px;
   }
+
+  /* ---------- Home dashboard ---------- */
+  .streak-badge{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--paper); border:1px solid var(--mist-line); border-radius:999px;
+    padding:8px 14px; font-size:13.5px; font-weight:500; margin-top:10px;
+  }
+  .history-row{ margin-top:14px; }
+  .history-row .top{ display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:6px; color:#4a5148; }
+  .dash-links{ display:flex; flex-direction:column; gap:8px; margin-top:20px; }
 </style>
 </head>
 <body>
@@ -952,20 +962,91 @@
     `;
   }
   function renderHomePlaceholder(session, profile) {
+    renderHome(session, profile);
+  }
+
+  async function renderHome(session, profile) {
     app.classList.remove('wide');
-    const name = profile?.first_name ? `, ${profile.first_name}` : '';
+    app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Dein Dashboard wird geladen …</p>`;
+
+    const { data: fullProfile } = await supabase
+      .from('profiles')
+      .select('first_name, current_streak, longest_streak')
+      .eq('id', session.user.id)
+      .single();
+
+    const { data: history } = await supabase
+      .from('pulse_sessions')
+      .select('id, pulse_date, pulse_score')
+      .eq('user_id', session.user.id)
+      .eq('completed', true)
+      .order('pulse_date', { ascending: false })
+      .limit(8);
+
+    const name = profile?.first_name || fullProfile?.first_name || '';
+    const streak = fullProfile?.current_streak ?? 0;
+    const orderedHistory = (history || []).slice().reverse(); // chronologisch für die Anzeige
+
+    const latest = orderedHistory[orderedHistory.length - 1];
+    const previous = orderedHistory[orderedHistory.length - 2];
+    const delta = latest && previous ? latest.pulse_score - previous.pulse_score : null;
+
     app.innerHTML = `
       <div class="logo"><span class="dot"></span> Vitara</div>
-      <div class="placeholder">
-        <h2>Willkommen${name} ✓</h2>
-        <p>Dein Dashboard mit Verlauf und Streak kommt als Nächstes.</p>
+      <h2 class="step-title">Willkommen zurück${name ? ', ' + escapeHtml(name) : ''}.</h2>
+      ${latest ? `<p class="step-sub">Letzter Pulse: ${new Date(latest.pulse_date).toLocaleDateString('de-DE', { day: '2-digit', month: 'long' })}</p>` : ''}
+      ${streak > 0 ? `<div class="streak-badge">🔥 ${streak} ${streak === 1 ? 'Woche' : 'Wochen'} in Folge</div>` : ''}
+
+      ${latest ? renderGauge(latest.pulse_score, delta) : `
+        <div class="placeholder">
+          <p>Du hast noch keinen Pulse abgeschlossen.</p>
+        </div>
+      `}
+
+      ${orderedHistory.length > 1 ? `
+        <h3 style="font-size:16px; margin-top:26px;">Dein Verlauf</h3>
+        ${orderedHistory.map(s => `
+          <div class="history-row">
+            <div class="top">
+              <span>${new Date(s.pulse_date).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</span>
+              <span class="val" style="font-weight:600;">${s.pulse_score}</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill" style="width:${s.pulse_score}%"></div></div>
+          </div>
+        `).join('')}
+      ` : ''}
+
+      <div class="dash-links">
+        <a class="btn-primary" href="#/pulse" style="text-align:center; text-decoration:none;">Nächsten Pulse starten →</a>
+        ${latest ? '<a class="link-btn" href="#/insights" style="text-align:center;">Letzte Erkenntnisse ansehen</a>' : ''}
       </div>
-      <a class="btn-primary" href="#/pulse" style="display:block; text-align:center; text-decoration:none; margin-top:8px;">Nächsten Pulse starten →</a>
       <button class="signout" id="signout-btn" style="margin-top:20px;">Abmelden</button>
     `;
-    document.getElementById('signout-btn').addEventListener('click', async () => {
-      await supabase.auth.signOut();
-    });
+    document.getElementById('signout-btn').addEventListener('click', async () => { await supabase.auth.signOut(); });
+  }
+
+  function renderGauge(score, delta) {
+    const circumference = 2 * Math.PI * 78;
+    const offset = circumference - (Math.max(0, Math.min(100, score)) / 100) * circumference;
+    const deltaLabel = delta === null ? '' : (delta > 0 ? `▲ ${delta} seit letztem Pulse` : delta < 0 ? `▼ ${Math.abs(delta)} seit letztem Pulse` : 'Unverändert seit letztem Pulse');
+
+    return `
+      <div style="text-align:center;">
+        <div class="gauge-wrap">
+          <svg viewBox="0 0 180 180">
+            <circle cx="90" cy="90" r="78" fill="none" stroke="var(--mist)" stroke-width="13" />
+            <circle cx="90" cy="90" r="78" fill="none" stroke="var(--pine)" stroke-width="13"
+              stroke-linecap="round" transform="rotate(-90 90 90)"
+              stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" />
+          </svg>
+          <div class="gauge-center">
+            <div class="num">${score}</div>
+            <div class="label">PULSE SCORE</div>
+          </div>
+        </div>
+        ${deltaLabel ? `<p style="font-size:13px; color:var(--pine-dim); margin-top:4px;">${deltaLabel}</p>` : ''}
+      </div>
+    `;
   }
 </script>
 
