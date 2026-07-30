@@ -1089,7 +1089,7 @@
 
     const { data: history } = await supabase
       .from('pulse_sessions')
-      .select('id, pulse_date, pulse_score')
+      .select('id, pulse_date, pulse_score, energy_score, recovery_score, performance_score, resilience_score, longevity_score')
       .eq('user_id', session.user.id)
       .eq('completed', true)
       .order('pulse_date', { ascending: false })
@@ -1107,7 +1107,10 @@
       <div class="logo"><span class="dot"></span> Vitara</div>
       <h2 class="step-title">Willkommen zurück${name ? ', ' + escapeHtml(name) : ''}.</h2>
       ${latest ? `<p class="step-sub">Letzter Pulse: ${new Date(latest.pulse_date).toLocaleDateString('de-DE', { day: '2-digit', month: 'long' })}</p>` : ''}
-      ${streak > 0 ? `<div class="streak-badge">🔥 ${streak} ${streak === 1 ? 'Woche' : 'Wochen'} in Folge</div>` : ''}
+      ${streak > 0 ? `
+        <div class="streak-badge">🔥 ${streak} ${streak === 1 ? 'Woche' : 'Wochen'} in Folge</div>
+        ${fullProfile?.longest_streak > streak ? `<span style="font-size:12.5px; color:#7a8279; margin-left:8px;">Bestwert: ${fullProfile.longest_streak}</span>` : ''}
+      ` : ''}
 
       ${latest ? renderGauge(latest.pulse_score, delta) : `
         <div class="placeholder">
@@ -1115,17 +1118,18 @@
         </div>
       `}
 
+      ${latest ? `
+        <h3 style="font-size:16px; margin-top:26px;">Deine fünf Dimensionen</h3>
+        ${renderDimensionBreakdown(latest)}
+      ` : ''}
+
       ${orderedHistory.length > 1 ? `
-        <h3 style="font-size:16px; margin-top:26px;">Dein Verlauf</h3>
-        ${orderedHistory.map(s => `
-          <div class="history-row">
-            <div class="top">
-              <span>${new Date(s.pulse_date).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</span>
-              <span class="val" style="font-weight:600;">${s.pulse_score}</span>
-            </div>
-            <div class="bar-track"><div class="bar-fill" style="width:${s.pulse_score}%"></div></div>
-          </div>
-        `).join('')}
+        <h3 style="font-size:16px; margin-top:26px;">Score-Verlauf</h3>
+        ${renderTrendChart(orderedHistory)}
+        <div style="display:flex; justify-content:space-between; font-size:11.5px; color:#7a8279; margin-top:4px;">
+          <span>${new Date(orderedHistory[0].pulse_date).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</span>
+          <span>${new Date(orderedHistory[orderedHistory.length - 1].pulse_date).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</span>
+        </div>
       ` : ''}
 
       <div class="dash-links">
@@ -1135,6 +1139,45 @@
       <button class="signout" id="signout-btn" style="margin-top:20px;">Abmelden</button>
     `;
     document.getElementById('signout-btn').addEventListener('click', async () => { await supabase.auth.signOut(); });
+  }
+
+  function renderDimensionBreakdown(latest) {
+    const dims = [
+      ['Energy', latest.energy_score],
+      ['Recovery', latest.recovery_score],
+      ['Performance', latest.performance_score],
+      ['Resilience', latest.resilience_score],
+      ['Longevity', latest.longevity_score],
+    ];
+    return dims.map(([label, value]) => `
+      <div class="metric-row">
+        <div class="top"><span>${label}</span><span class="val">${value}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${value}%"></div></div>
+      </div>
+    `).join('');
+  }
+
+  function renderTrendChart(history) {
+    const w = 320, h = 100, pad = 12;
+    const n = history.length;
+    const points = history.map((s, i) => {
+      const x = n > 1 ? pad + (i * (w - 2 * pad)) / (n - 1) : w / 2;
+      const y = pad + (h - 2 * pad) * (1 - Math.max(0, Math.min(100, s.pulse_score)) / 100);
+      return { x, y, score: s.pulse_score };
+    });
+    const pathD = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+    const circles = points.map((p, i) => `
+      <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="${i === points.length - 1 ? 'var(--pine)' : 'var(--paper-dim)'}" stroke="var(--pine)" stroke-width="2" />
+    `).join('');
+    const lastPoint = points[points.length - 1];
+
+    return `
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; display:block; margin-top:8px;">
+        <path d="${pathD}" fill="none" stroke="var(--pine)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+        ${circles}
+        <text x="${lastPoint.x}" y="${lastPoint.y - 10}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--pine-dim)">${lastPoint.score}</text>
+      </svg>
+    `;
   }
 
   function renderGauge(score, delta) {
