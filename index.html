@@ -274,6 +274,21 @@
     border-top:1px solid rgba(245,243,238,0.18); padding-top:12px;
   }
 
+  /* ---------- Sicherheits-Hinweis (Red Flag) ---------- */
+  .safety-card{
+    background:var(--paper-dim); border:1px solid var(--mist-line);
+    border-radius:16px; padding:24px 22px; text-align:left;
+  }
+  .safety-card h2{ font-size:19px; }
+  .safety-card p{ font-size:14px; color:#4a5148; margin-top:10px; line-height:1.6; }
+  .safety-resource{
+    background:var(--paper); border:1px solid var(--mist-line); border-radius:12px;
+    padding:14px 16px; margin-top:14px;
+  }
+  .safety-resource strong{ font-size:14.5px; display:block; }
+  .safety-resource p{ margin-top:4px; font-size:13.5px; }
+  .safety-resource a{ color:var(--pine-dim); font-weight:500; }
+
   /* ---------- App navigation bar ---------- */
   .app-nav{
     display:none;
@@ -1113,6 +1128,7 @@
     `;
   }
   const FAQ_ITEMS = [
+    { q: 'Was mache ich in einer akuten Krise?', a: 'Die TelefonSeelsorge ist rund um die Uhr, kostenlos und anonym erreichbar: 0800 111 0 111, 0800 111 0 222 oder 116 123, auch per Chat auf telefonseelsorge.de. Vitara ersetzt keine professionelle Unterstützung.' },
     { q: 'Ersetzt Vitara einen Arztbesuch?', a: 'Nein. Vitara gibt dir Orientierung und Verständnis, stellt aber keine Diagnosen und ersetzt keine medizinische Behandlung.' },
     { q: 'Wie lange dauert ein Pulse?', a: 'Rund 10 Minuten pro Woche — ein kurzer Fragebogen zu den fünf Dimensionen Energy, Recovery, Performance, Resilience und Longevity.' },
     { q: 'Wie wird mein Pulse Score berechnet?', a: 'Jede Antwort wird auf eine einheitliche Skala normalisiert und nach Kategorie gewichtet. Der Gesamt-Score ist der Durchschnitt aus allen fünf Dimensionen.' },
@@ -1504,7 +1520,7 @@
 
     const { data: questions, error: qError } = await supabase
       .from('questions')
-      .select('id, category, question_text, answer_type, min_value, max_value, sort_order')
+      .select('id, category, question_text, answer_type, min_value, max_value, sort_order, is_safety_check')
       .eq('is_active', true)
       .order('sort_order', { ascending: true });
 
@@ -1550,6 +1566,7 @@
 
     const remaining = questions.filter(q => !answeredQuestionIds.includes(q.id));
     let qIndex = 0;
+    let safetyFlagTriggered = false;
 
     renderQuestion();
 
@@ -1628,8 +1645,42 @@
         return;
       }
 
+      // Ruhiger Sicherheits-Check: keine Diagnose, nur ein Angebot für zusätzliche Unterstützung
+      if (q.is_safety_check) {
+        const max = q.max_value ?? 10;
+        const min = q.min_value ?? 0;
+        const isSevere = value >= min + (max - min) * 0.8;
+        if (isSevere) {
+          safetyFlagTriggered = true;
+          renderSafetyCheck();
+          return;
+        }
+      }
+
       qIndex += 1;
       renderQuestion();
+    }
+
+    function renderSafetyCheck() {
+      app.innerHTML = `
+        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="safety-card">
+          <h2>Bevor wir weitermachen</h2>
+          <p>Deine Antwort deutet darauf hin, dass die Belastung gerade sehr groß ist. Das nehmen wir ernst.</p>
+          <p>Falls es dir gerade schwerfällt oder du das Gefühl hast, nicht mehr allein zurechtzukommen, ist die TelefonSeelsorge rund um die Uhr, kostenlos und anonym für dich da.</p>
+          <div class="safety-resource">
+            <strong>TelefonSeelsorge</strong>
+            <p>📞 0800 111 0 111 oder 0800 111 0 222 (auch: 116 123)</p>
+            <p><a href="https://www.telefonseelsorge.de" target="_blank" rel="noopener">telefonseelsorge.de</a> — auch per Chat oder Mail erreichbar</p>
+          </div>
+          <p style="font-size:12.5px; color:#7a8279; margin-top:14px;">Vitara ersetzt keine professionelle Unterstützung.</p>
+        </div>
+        <button type="button" class="btn-primary" id="safety-continue-btn" style="margin-top:20px;">Mit dem Pulse fortfahren</button>
+      `;
+      document.getElementById('safety-continue-btn').addEventListener('click', () => {
+        qIndex += 1;
+        renderQuestion();
+      });
     }
 
     async function finishPulse() {
@@ -1648,7 +1699,7 @@
         .eq('id', pulseSessionId)
         .single();
 
-      renderResult(result, calcResult?.new_achievements || []);
+      renderResult(result, safetyFlagTriggered ? [] : (calcResult?.new_achievements || []));
     }
 
     function renderResult(scores, newAchievements) {
