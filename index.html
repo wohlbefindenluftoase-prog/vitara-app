@@ -145,6 +145,55 @@
   .bar-track{ height:7px; background:var(--mist); border-radius:999px; overflow:hidden; }
   .bar-fill{ height:100%; border-radius:999px; background:linear-gradient(90deg, var(--pine-dim), var(--pine)); }
 
+  .scale-value-display{
+    text-align:center; font-family:"Fraunces", serif; font-weight:600;
+    font-size:48px; margin-bottom:6px; color:var(--ink);
+  }
+  input[type="range"]{
+    width:100%; -webkit-appearance:none; appearance:none;
+    height:6px; border-radius:999px; background:var(--mist); margin:14px 0;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:26px; height:26px; border-radius:50%;
+    background:var(--pine); cursor:pointer; border:3px solid var(--paper-dim);
+    box-shadow:0 2px 8px rgba(19,34,26,0.35);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:26px; height:26px; border-radius:50%; border:3px solid var(--paper-dim);
+    background:var(--pine); cursor:pointer; box-shadow:0 2px 8px rgba(19,34,26,0.35);
+  }
+
+  /* ---------- Wissen (Knowledge Library) ---------- */
+  .wissen-search{ display:flex; gap:8px; margin-bottom:20px; }
+  .wissen-search input{ flex:1; }
+  .topic-card{
+    display:block; text-align:left; width:100%; text-decoration:none; color:inherit;
+    border:1px solid var(--mist-line); border-radius:14px; padding:16px 18px;
+    margin-top:10px; background:var(--paper); cursor:pointer;
+  }
+  .topic-card:hover{ border-color:var(--pine); }
+  .topic-card h3{ font-size:15px; font-weight:600; }
+  .topic-card p{ font-size:13px; color:#586059; margin-top:4px; }
+
+  .claim-card{
+    border:1px solid var(--mist-line); border-radius:14px; padding:16px 18px;
+    margin-top:12px; background:var(--paper);
+  }
+  .claim-card .claim-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .claim-card .stars{ font-size:13px; color:var(--pine); white-space:nowrap; }
+  .status-badge{
+    display:inline-block; font-size:10.5px; font-weight:600; letter-spacing:0.02em;
+    padding:3px 9px; border-radius:999px; margin-top:8px; text-transform:uppercase;
+  }
+  .status-established{ background:rgba(62,143,104,0.15); color:var(--pine-dim); }
+  .status-plausible{ background:rgba(201,154,61,0.15); color:#8a6a20; }
+  .status-controversial{ background:rgba(201,122,61,0.15); color:#8a5420; }
+  .status-refuted{ background:rgba(179,66,58,0.12); color:var(--error); }
+  .status-data_gap{ background:rgba(122,130,121,0.15); color:#6b7269; }
+  .claim-card .claim-text{ font-size:14px; margin-top:8px; }
+  .claim-card .claim-explanation{ font-size:12.5px; color:#586059; margin-top:6px; }
+
   /* ---------- Insights page ---------- */
   .insight-card{
     text-align:left; border:1px solid var(--mist); border-radius:16px;
@@ -324,6 +373,16 @@
   .stat-tile-lg .stat-icon{ font-size:24px; }
   .stat-tile-lg .stat-value{ font-family:"Fraunces", serif; font-weight:600; font-size:22px; }
   .stat-tile-lg .stat-label{ font-size:11px; color:#7a8279; text-align:center; }
+
+  .achievement-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+  .achievement-badge{
+    display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px;
+    background:var(--paper); border:1px solid var(--mist-line); border-radius:14px; padding:16px 10px;
+  }
+  .achievement-badge.locked{ opacity:0.4; }
+  .achievement-badge .badge-icon{ font-size:26px; }
+  .achievement-badge .badge-title{ font-size:12px; font-weight:600; }
+  .achievement-badge .badge-desc{ font-size:10.5px; color:#7a8279; }
 </style>
 </head>
 <body class="centered">
@@ -336,6 +395,7 @@
       <a href="#/pulse" data-path="/pulse">Pulse</a>
       <a href="#/insights" data-path="/insights">Fortschritt</a>
       <a href="#/mission" data-path="/mission">Mission</a>
+      <a href="#/wissen" data-path="/wissen">Wissen</a>
       <a href="#/faq" data-path="/faq">FAQ</a>
     </div>
     <button type="button" class="app-nav-avatar" id="global-profile-nav">?</button>
@@ -371,6 +431,7 @@
     '/mission': renderMission,
     '/faq': renderFAQ,
     '/profile': renderProfilePage,
+    '/wissen': renderWissen,
   };
 
   let currentSession = null;
@@ -426,11 +487,11 @@
       document.body.classList.add('shell');
       avatarEl.textContent = (profile?.first_name || session.user.email || '?').trim().charAt(0).toUpperCase();
       navEl.querySelectorAll('.app-nav-tabs a').forEach(a => {
-        a.classList.toggle('active', a.dataset.path === path);
+        a.classList.toggle('active', path === a.dataset.path || path.startsWith(a.dataset.path + '/'));
       });
     }
 
-    const renderFn = routes[path] || renderAuth;
+    const renderFn = routes[path] || (path.startsWith('/wissen/') ? renderWissen : renderAuth);
     renderFn(session, profile);
   }
 
@@ -860,8 +921,152 @@
   }
 
   // ------------------------------------------------------------
-  // Seite: FAQ
+  // Seite: Wissen (Research Library)
   // ------------------------------------------------------------
+  const CLAIM_STATUS_LABELS = {
+    established: 'Etabliert', plausible: 'Vermutet', controversial: 'Kontrovers',
+    refuted: 'Widerlegt', data_gap: 'Datenlücke',
+  };
+
+  function starsHtml(n) {
+    const count = Number(n) || 0;
+    return '★'.repeat(count) + '☆'.repeat(Math.max(0, 5 - count));
+  }
+
+  async function renderWissen() {
+    app.classList.remove('wide');
+    const path = location.hash.slice(1);
+    const parts = path.split('/').filter(Boolean); // ['wissen', ...]
+
+    if (parts.length === 1) {
+      await renderWissenOverview();
+    } else if (parts[1] === 'topic' && parts[2]) {
+      await renderWissenTopic(parts[2]);
+    } else {
+      location.hash = '#/wissen';
+    }
+  }
+
+  async function renderWissenOverview() {
+    app.innerHTML = `<p class="step-sub">Wird geladen …</p>`;
+
+    const { data: modules, error } = await supabase
+      .from('knowledge_topics')
+      .select('id, title, description')
+      .is('parent_id', null)
+      .eq('status', 'approved')
+      .order('module_number', { ascending: true });
+
+    if (error) {
+      app.innerHTML = `<p class="msg err">Fehler: ${escapeHtml(error.message)}</p>`;
+      return;
+    }
+
+    app.innerHTML = `
+      <h2 class="step-title">Wissen</h2>
+      <p class="step-sub">Evidenzbasierte Hintergründe zu allem, was in deinem Pulse steckt.</p>
+      <div class="wissen-search">
+        <input type="text" id="wissen-search-input" placeholder="z. B. Magnesium, Schlaf, Mikrobiom …" />
+        <button type="button" class="btn-primary" id="wissen-search-btn" style="margin-top:0;">Suchen</button>
+      </div>
+      <div id="wissen-search-results"></div>
+      <div id="wissen-modules">
+        ${(modules || []).map(m => `
+          <a class="topic-card" href="#/wissen/topic/${m.id}">
+            <h3>${escapeHtml(m.title)}</h3>
+            <p>${escapeHtml(m.description || '')}</p>
+          </a>
+        `).join('') || '<p class="step-sub">Noch keine freigegebenen Module.</p>'}
+      </div>
+    `;
+
+    document.getElementById('wissen-search-btn').addEventListener('click', runWissenSearch);
+    document.getElementById('wissen-search-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') runWissenSearch();
+    });
+
+    async function runWissenSearch() {
+      const query = document.getElementById('wissen-search-input').value.trim();
+      const resultsEl = document.getElementById('wissen-search-results');
+      const modulesEl = document.getElementById('wissen-modules');
+      if (!query) { resultsEl.innerHTML = ''; modulesEl.style.display = 'block'; return; }
+
+      resultsEl.innerHTML = `<p class="step-sub">Suche läuft …</p>`;
+      modulesEl.style.display = 'none';
+
+      const { data: results, error: searchError } = await supabase.rpc('search_knowledge', { p_query: query });
+
+      if (searchError) {
+        resultsEl.innerHTML = `<p class="msg err">Fehler: ${escapeHtml(searchError.message)}</p>`;
+        return;
+      }
+
+      if (!results || results.length === 0) {
+        resultsEl.innerHTML = `<p class="step-sub">Keine Treffer für "${escapeHtml(query)}".</p>`;
+        return;
+      }
+
+      resultsEl.innerHTML = results.map(r => {
+        if (r.type === 'topic') {
+          return `
+            <a class="topic-card" href="#/wissen/topic/${r.id}">
+              <h3>${escapeHtml(r.title)}</h3>
+              <p>${escapeHtml(r.description || '')}</p>
+            </a>
+          `;
+        }
+        return `
+          <a class="topic-card" href="#/wissen/topic/${r.topic_id}">
+            <span class="stars">${starsHtml(r.stars)}</span>
+            <h3>${escapeHtml(r.claim_text)}</h3>
+            <span class="status-badge status-${r.claim_status}">${CLAIM_STATUS_LABELS[r.claim_status] || r.claim_status}</span>
+          </a>
+        `;
+      }).join('');
+    }
+  }
+
+  async function renderWissenTopic(topicId) {
+    app.innerHTML = `<p class="step-sub">Wird geladen …</p>`;
+
+    const [{ data: children }, { data: topicData, error }] = await Promise.all([
+      supabase.from('knowledge_topics').select('id, title, description')
+        .eq('parent_id', topicId).eq('status', 'approved').order('sort_order', { ascending: true }),
+      supabase.rpc('get_knowledge_topic', { p_topic_id: topicId }),
+    ]);
+
+    if (error || !topicData) {
+      app.innerHTML = `<p class="msg err">Fehler: ${escapeHtml(error?.message || 'Thema nicht gefunden.')}</p>`;
+      return;
+    }
+
+    const topic = topicData.topic;
+    const claims = topicData.claims || [];
+
+    app.innerHTML = `
+      <a href="#/wissen" class="link-btn" style="padding-left:0;">← Zurück zu Wissen</a>
+      <h2 class="step-title" style="margin-top:10px;">${escapeHtml(topic.title)}</h2>
+      ${topic.description ? `<p class="step-sub">${escapeHtml(topic.description)}</p>` : ''}
+
+      ${children && children.length ? children.map(c => `
+        <a class="topic-card" href="#/wissen/topic/${c.id}">
+          <h3>${escapeHtml(c.title)}</h3>
+          <p>${escapeHtml(c.description || '')}</p>
+        </a>
+      `).join('') : ''}
+
+      ${claims.length ? claims.map(c => `
+        <div class="claim-card">
+          <div class="claim-top">
+            <p class="claim-text">${escapeHtml(c.claim_text)}</p>
+            <span class="stars">${starsHtml(c.stars)}</span>
+          </div>
+          <span class="status-badge status-${c.claim_status}">${CLAIM_STATUS_LABELS[c.claim_status] || c.claim_status}</span>
+          ${c.explanation ? `<p class="claim-explanation">${escapeHtml(c.explanation)}</p>` : ''}
+        </div>
+      `).join('') : (children && children.length ? '' : '<p class="step-sub">Für dieses Thema sind noch keine Aussagen freigegeben.</p>')}
+    `;
+  }
   const FAQ_ITEMS = [
     { q: 'Ersetzt Vitara einen Arztbesuch?', a: 'Nein. Vitara gibt dir Orientierung und Verständnis, stellt aber keine Diagnosen und ersetzt keine medizinische Behandlung.' },
     { q: 'Wie lange dauert ein Pulse?', a: 'Rund 10 Minuten pro Woche — ein kurzer Fragebogen zu den fünf Dimensionen Energy, Recovery, Performance, Resilience und Longevity.' },
@@ -1323,12 +1528,10 @@
         </div>
       `;
 
-      if (q.answer_type === 'scale' || q.answer_type === 'scale_reverse') {
-        document.querySelectorAll('#answer-scale .scale-btn').forEach(btn => {
-          btn.addEventListener('click', () => {
-            document.querySelectorAll('#answer-scale .scale-btn').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-          });
+      const sliderEl = document.getElementById('answer-scale-slider');
+      if (sliderEl) {
+        sliderEl.addEventListener('input', () => {
+          document.getElementById('scale-value-display').textContent = sliderEl.value;
         });
       }
 
@@ -1338,15 +1541,13 @@
     function renderAnswerInput(q) {
       if (q.answer_type === 'scale' || q.answer_type === 'scale_reverse') {
         const min = q.min_value ?? 1, max = q.max_value ?? 10;
-        const values = [];
-        for (let v = min; v <= max; v++) values.push(v);
+        const startValue = Math.round((min + max) / 2);
         return `
-          <div class="scale-row" id="answer-scale">
-            ${values.map(v => `<button type="button" class="scale-btn" data-value="${v}">${v}</button>`).join('')}
-          </div>
+          <div class="scale-value-display" id="scale-value-display">${startValue}</div>
+          <input type="range" id="answer-scale-slider" min="${min}" max="${max}" step="1" value="${startValue}" />
           <div class="scale-labels">
-            <span>${q.answer_type === 'scale_reverse' ? 'Gar nicht' : 'Sehr niedrig'}</span>
-            <span>${q.answer_type === 'scale_reverse' ? 'Sehr stark' : 'Sehr hoch'}</span>
+            <span>${min} = ${q.answer_type === 'scale_reverse' ? 'Gar nicht' : 'Sehr niedrig'}</span>
+            <span>${max} = ${q.answer_type === 'scale_reverse' ? 'Sehr stark' : 'Sehr hoch'}</span>
           </div>
         `;
       }
@@ -1358,9 +1559,7 @@
       let value = null;
 
       if (q.answer_type === 'scale' || q.answer_type === 'scale_reverse') {
-        const selected = document.querySelector('#answer-scale .scale-btn.selected');
-        if (!selected) { msg.textContent = 'Bitte wähl einen Wert aus.'; msg.className = 'msg err'; return; }
-        value = Number(selected.dataset.value);
+        value = Number(document.getElementById('answer-scale-slider').value);
       } else {
         const input = document.getElementById('answer-number');
         if (input.value === '') { msg.textContent = 'Bitte gib einen Wert ein.'; msg.className = 'msg err'; return; }
@@ -1391,7 +1590,7 @@
     async function finishPulse() {
       app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Dein Pulse Score wird berechnet …</p>`;
 
-      const { error } = await supabase.rpc('calculate_pulse_scores', { p_session_id: pulseSessionId });
+      const { data: calcResult, error } = await supabase.rpc('calculate_pulse_scores', { p_session_id: pulseSessionId });
 
       if (error) {
         app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="msg err">Fehler: ${escapeHtml(error.message)}</p>`;
@@ -1404,10 +1603,10 @@
         .eq('id', pulseSessionId)
         .single();
 
-      renderResult(result);
+      renderResult(result, calcResult?.new_achievements || []);
     }
 
-    function renderResult(scores) {
+    function renderResult(scores, newAchievements) {
       const circumference = 2 * Math.PI * 78;
       const offset = circumference - (Math.max(0, Math.min(100, scores.pulse_score)) / 100) * circumference;
 
@@ -1421,6 +1620,15 @@
 
       app.innerHTML = `
         <div class="logo"><span class="dot"></span> Vitara</div>
+        ${newAchievements && newAchievements.length ? newAchievements.map(a => `
+          <div style="background:var(--pine-dim); color:var(--paper); border-radius:12px; padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:10px;">
+            <span style="font-size:20px;">🏅</span>
+            <div>
+              <strong style="font-size:13.5px;">Neuer Erfolg: ${escapeHtml(a.title)}</strong>
+              <p style="font-size:12px; color:#D7E4DC; margin-top:2px;">${escapeHtml(a.description)}</p>
+            </div>
+          </div>
+        `).join('') : ''}
         <div style="text-align:center;">
           <p class="mono" style="font-size:11.5px; color:#7a8279;">DEIN PULSE SCORE</p>
           <div class="gauge-wrap">
@@ -1636,6 +1844,15 @@
     `;
   }
 
+  const ACHIEVEMENT_DEFINITIONS = [
+    { key: 'first_pulse', title: 'Erster Pulse', description: 'Ersten Pulse abgeschlossen', icon: '🌱' },
+    { key: 'streak_3', title: '3 Wochen in Folge', description: 'Streak von 3 Wochen', icon: '🔥' },
+    { key: 'streak_10', title: '10 Wochen in Folge', description: 'Streak von 10 Wochen', icon: '🔥' },
+    { key: 'ten_pulses', title: '10 Pulses', description: '10 Pulses insgesamt', icon: '📊' },
+    { key: 'high_score_90', title: 'Spitzenwert', description: 'Score von 90+ erreicht', icon: '⭐' },
+    { key: 'balanced_profile', title: 'Ausgeglichen', description: 'Alle 5 Dimensionen nah beieinander', icon: '⚖️' },
+  ];
+
   // ------------------------------------------------------------
   // Seite: Volles Profil (aus dem Schnellmenü heraus erreichbar)
   // ------------------------------------------------------------
@@ -1659,6 +1876,13 @@
       .select('pulse_score')
       .eq('user_id', session.user.id)
       .eq('completed', true);
+
+    const { data: unlockedAchievements } = await supabase
+      .from('achievements')
+      .select('achievement_key')
+      .eq('user_id', session.user.id);
+
+    const unlockedKeys = (unlockedAchievements || []).map(a => a.achievement_key);
 
     const totalPulses = pulseStats?.length || 0;
     const avgScore = totalPulses > 0
@@ -1703,6 +1927,20 @@
           <div class="stat-value">${avgScore}</div>
           <div class="stat-label">Ø Pulse Score</div>
         </div>
+      </div>
+
+      <p class="panel-section-title" style="margin-top:24px;">Deine Erfolge</p>
+      <div class="achievement-grid">
+        ${ACHIEVEMENT_DEFINITIONS.map(def => {
+          const unlocked = unlockedKeys.includes(def.key);
+          return `
+            <div class="achievement-badge ${unlocked ? '' : 'locked'}">
+              <span class="badge-icon">${def.icon}</span>
+              <span class="badge-title">${escapeHtml(def.title)}</span>
+              <span class="badge-desc">${escapeHtml(def.description)}</span>
+            </div>
+          `;
+        }).join('')}
       </div>
 
       <div class="dash-links" style="margin-top:28px;">
