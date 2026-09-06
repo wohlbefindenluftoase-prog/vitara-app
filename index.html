@@ -82,6 +82,24 @@
   .placeholder{ text-align:center; padding:20px 0; }
   .placeholder p{ color:#586059; font-size:14px; margin-top:10px; }
 
+  /* ---------- Einheitliche Empty-/Error-States ---------- */
+  .state-card{
+    background:var(--paper-dim); border:1px solid var(--mist-line); border-radius:16px;
+    padding:32px 24px; text-align:center; margin-top:12px;
+  }
+  .state-card .state-icon{ font-size:26px; margin-bottom:10px; line-height:1; }
+  .state-card h3{ font-size:17px; }
+  .state-card p{ font-size:13.5px; color:#586059; margin-top:8px; line-height:1.55; }
+  .state-card .btn-primary{ display:inline-block; text-decoration:none; margin-top:18px; }
+  .state-card.error{ border-color:rgba(179,66,58,0.25); background:rgba(179,66,58,0.05); }
+  .state-card.error h3{ color:var(--error); }
+  .state-card .retry-btn{
+    margin-top:16px; background:var(--paper); color:var(--ink); border:1px solid var(--mist-line);
+    font-family:"IBM Plex Sans", sans-serif; font-weight:500; font-size:13.5px;
+    padding:10px 18px; border-radius:10px; cursor:pointer;
+  }
+  .state-card .retry-btn:hover{ border-color:var(--pine); }
+
   .signout{
     margin-top:20px; background:none; border:none; color:#6b756f;
     font-size:13px; text-decoration:underline; cursor:pointer; padding:0;
@@ -1009,6 +1027,41 @@
   }
 
   // ------------------------------------------------------------
+  // Einheitliche Empty- und Error-States
+  //
+  // Statt dass jede Seite ihre eigene Fehler-/Leer-Ansicht baut, laufen ab jetzt
+  // alle "hier gibt es (noch) nichts zu sehen"- und "das ist schiefgelaufen"-Fälle
+  // über diese zwei Funktionen — für ein ruhigeres, konsistentes Erscheinungsbild.
+  // ------------------------------------------------------------
+  function emptyStateHtml({ icon = '🌱', title = '', text = '', actionLabel = '', actionHref = '' } = {}) {
+    return `
+      <div class="state-card">
+        ${icon ? `<div class="state-icon">${icon}</div>` : ''}
+        ${title ? `<h3>${escapeHtml(title)}</h3>` : ''}
+        ${text ? `<p>${escapeHtml(text)}</p>` : ''}
+        ${actionHref ? `<a class="btn-primary" href="${actionHref}">${escapeHtml(actionLabel || 'Weiter')}</a>` : ''}
+      </div>
+    `;
+  }
+
+  function errorStateHtml({ text = '', retryId = '' } = {}) {
+    return `
+      <div class="state-card error">
+        <div class="state-icon">⚠</div>
+        <h3>Das hat gerade nicht geklappt</h3>
+        <p>${escapeHtml(text || 'Bitte versuch es gleich noch einmal.')}</p>
+        ${retryId ? `<button type="button" class="retry-btn" id="${retryId}">Erneut versuchen</button>` : ''}
+      </div>
+    `;
+  }
+
+  // Bindet auf allen per errorStateHtml erzeugten Retry-Buttons denselben
+  // Reload-Mechanismus (kompletter Router-Durchlauf inkl. Session-/Profil-Check).
+  function bindRetryButton(retryId) {
+    document.getElementById(retryId)?.addEventListener('click', () => router());
+  }
+
+  // ------------------------------------------------------------
   // Seite: Wissen (Research Library)
   //
   // Datenquelle: entweder direkt aus den Tabellen (nur status='approved',
@@ -1203,7 +1256,8 @@
     try {
       index = await loadKnowledgeData();
     } catch (e) {
-      app.innerHTML = `<p class="msg err">Fehler beim Laden der Wissensbibliothek: ${escapeHtml(e?.message || String(e))}</p>`;
+      app.innerHTML = errorStateHtml({ text: `Die Wissensbibliothek konnte nicht geladen werden (${e?.message || String(e)}).`, retryId: 'wissen-retry-btn' });
+      bindRetryButton('wissen-retry-btn');
       return;
     }
 
@@ -1348,10 +1402,13 @@
   function renderWissenTopic(index, topicId) {
     const topic = index.topicsById[topicId];
     if (!topic) {
-      app.innerHTML = `
-        <p class="msg err">Dieses Thema wurde nicht gefunden${index.isPreview ? '' : ' (oder ist noch nicht freigegeben)'}.</p>
-        <a href="#/wissen" class="link-btn" style="padding-left:0;">← Zurück zu Wissen</a>
-      `;
+      app.innerHTML = emptyStateHtml({
+        icon: '🔍',
+        title: 'Thema nicht gefunden',
+        text: index.isPreview ? 'Dieses Thema existiert nicht (mehr).' : 'Dieses Thema existiert nicht oder ist noch nicht freigegeben.',
+        actionLabel: '← Zurück zu Wissen',
+        actionHref: '#/wissen',
+      });
       return;
     }
 
@@ -1372,7 +1429,7 @@
       `).join('') : ''}
 
       ${claims.length ? claims.map(c => renderClaimCard(index, c)).join('')
-        : (children.length ? '' : '<p class="step-sub">Für dieses Thema sind noch keine Aussagen hinterlegt.</p>')}
+        : (children.length ? '' : emptyStateHtml({ icon: '📚', title: 'Noch nichts hinterlegt', text: 'Für dieses Thema sind noch keine Aussagen hinterlegt.' }))}
     `;
 
     document.querySelectorAll('.evidence-toggle').forEach(btn => {
@@ -1416,7 +1473,8 @@
       .single();
 
     if (profileError || !profile) {
-      panel.innerHTML = `<p class="msg err">Fehler: ${escapeHtml(profileError?.message || 'Profil nicht gefunden.')}</p>`;
+      panel.innerHTML = errorStateHtml({ text: profileError?.message || 'Profil konnte nicht geladen werden.', retryId: 'panel-retry-btn' });
+      document.getElementById('panel-retry-btn')?.addEventListener('click', () => renderProfilePanel(session));
       return;
     }
 
@@ -1783,8 +1841,9 @@
     if (qError || !questions || questions.length === 0) {
       app.innerHTML = `
         <div class="logo"><span class="dot"></span> Vitara</div>
-        <p class="msg err">Der Fragebogen konnte nicht geladen werden${qError ? ': ' + escapeHtml(qError.message) : ''}.</p>
+        ${errorStateHtml({ text: 'Der Fragebogen konnte nicht geladen werden' + (qError ? ` (${qError.message})` : '') + '.', retryId: 'pulse-questions-retry-btn' })}
       `;
+      bindRetryButton('pulse-questions-retry-btn');
       return;
     }
 
@@ -1814,7 +1873,8 @@
         .select('id')
         .single();
       if (sError) {
-        app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="msg err">Fehler: ${escapeHtml(sError.message)}</p>`;
+        app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div>${errorStateHtml({ text: sError.message, retryId: 'pulse-newsession-retry-btn' })}`;
+        bindRetryButton('pulse-newsession-retry-btn');
         return;
       }
       pulseSessionId = newSession.id;
@@ -1945,7 +2005,8 @@
       const { data: calcResult, error } = await supabase.rpc('calculate_pulse_scores', { p_session_id: pulseSessionId });
 
       if (error) {
-        app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="msg err">Fehler: ${escapeHtml(error.message)}</p>`;
+        app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div>${errorStateHtml({ text: error.message, retryId: 'pulse-finish-retry-btn' })}`;
+        document.getElementById('pulse-finish-retry-btn')?.addEventListener('click', () => finishPulse());
         return;
       }
 
@@ -2033,11 +2094,13 @@
     if (sessionError || !latestSession) {
       app.innerHTML = `
         <div class="logo"><span class="dot"></span> Vitara</div>
-        <div class="placeholder">
-          <h2>Noch kein abgeschlossener Pulse</h2>
-          <p>Mach zuerst deinen ersten Pulse, dann zeigen wir dir hier deine Erkenntnisse.</p>
-        </div>
-        <a class="btn-primary" href="#/pulse" style="display:block; text-align:center; text-decoration:none; margin-top:8px;">Ersten Pulse starten →</a>
+        ${emptyStateHtml({
+          icon: '📊',
+          title: 'Noch kein abgeschlossener Pulse',
+          text: 'Mach zuerst deinen ersten Pulse, dann zeigen wir dir hier deine Erkenntnisse.',
+          actionLabel: 'Ersten Pulse starten →',
+          actionHref: '#/pulse',
+        })}
       `;
       return;
     }
@@ -2047,7 +2110,8 @@
     });
 
     if (insightsError) {
-      app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="msg err">Fehler: ${escapeHtml(insightsError.message)}</p>`;
+      app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div>${errorStateHtml({ text: insightsError.message, retryId: 'insights-retry-btn' })}`;
+      bindRetryButton('insights-retry-btn');
       return;
     }
 
@@ -2131,8 +2195,13 @@
     if (sessionError || !latestSession) {
       app.innerHTML = `
         <div class="logo"><span class="dot"></span> Vitara</div>
-        <div class="placeholder"><p>Mach zuerst deinen ersten Pulse, dann zeigen wir dir hier deine Mission.</p></div>
-        <a class="btn-primary" href="#/pulse" style="display:block; text-align:center; text-decoration:none; margin-top:8px;">Ersten Pulse starten →</a>
+        ${emptyStateHtml({
+          icon: '🎯',
+          title: 'Noch keine Mission verfügbar',
+          text: 'Mach zuerst deinen ersten Pulse, dann zeigen wir dir hier deine Mission.',
+          actionLabel: 'Ersten Pulse starten →',
+          actionHref: '#/pulse',
+        })}
       `;
       return;
     }
@@ -2142,7 +2211,8 @@
     });
 
     if (insightsError) {
-      app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="msg err">Fehler: ${escapeHtml(insightsError.message)}</p>`;
+      app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div>${errorStateHtml({ text: insightsError.message, retryId: 'mission-retry-btn' })}`;
+      bindRetryButton('mission-retry-btn');
       return;
     }
 
@@ -2168,8 +2238,13 @@
     if (!chosen) {
       app.innerHTML = `
         <div class="logo"><span class="dot"></span> Vitara</div>
-        <div class="placeholder"><p>Für diesen Pulse ist aktuell keine Mission hinterlegt.</p></div>
-        <a class="btn-primary" href="#/home" style="display:block; text-align:center; text-decoration:none; margin-top:8px;">Weiter zum Dashboard →</a>
+        ${emptyStateHtml({
+          icon: '🎯',
+          title: 'Keine Mission hinterlegt',
+          text: 'Für diesen Pulse ist aktuell keine Mission hinterlegt.',
+          actionLabel: 'Weiter zum Dashboard →',
+          actionHref: '#/home',
+        })}
       `;
       return;
     }
@@ -2229,7 +2304,8 @@
       .single();
 
     if (profileError || !profile) {
-      app.innerHTML = `<p class="msg err">Fehler: ${escapeHtml(profileError?.message || 'Profil nicht gefunden.')}</p>`;
+      app.innerHTML = errorStateHtml({ text: profileError?.message || 'Profil konnte nicht geladen werden.', retryId: 'profile-page-retry-btn' });
+      bindRetryButton('profile-page-retry-btn');
       return;
     }
 
@@ -2350,11 +2426,11 @@
         ${fullProfile?.longest_streak > streak ? `<span style="font-size:12.5px; color:#7a8279; margin-left:8px;">Bestwert: ${fullProfile.longest_streak}</span>` : ''}
       ` : ''}
 
-      ${latest ? renderGauge(latest.pulse_score, delta) : `
-        <div class="placeholder">
-          <p>Du hast noch keinen Pulse abgeschlossen.</p>
-        </div>
-      `}
+      ${latest ? renderGauge(latest.pulse_score, delta) : emptyStateHtml({
+        icon: '👋',
+        title: 'Noch kein Pulse',
+        text: 'Du hast noch keinen Pulse abgeschlossen — starte unten deinen ersten.',
+      })}
 
       ${latest ? `
         <h3 style="font-size:16px; margin-top:26px;">Deine fünf Dimensionen</h3>
