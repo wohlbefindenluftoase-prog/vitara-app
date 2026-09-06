@@ -201,6 +201,62 @@
   }
   .subtopic-tag:hover{ border-color:var(--pine); }
 
+  /* ---------- Wissen: Breadcrumb, Vorschau-Banner, Badges, Quellen ---------- */
+  .breadcrumb{ font-size:12.5px; color:#7a8279; margin-bottom:14px; display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+  .breadcrumb a{ color:#7a8279; text-decoration:none; }
+  .breadcrumb a:hover{ color:var(--pine-dim); text-decoration:underline; }
+  .breadcrumb .sep{ color:#c3cbc4; }
+  .breadcrumb .current{ color:var(--ink); font-weight:500; }
+
+  .preview-banner{
+    background:var(--pine-dim); color:var(--paper); border-radius:12px;
+    padding:10px 14px; font-size:12.5px; margin-bottom:16px;
+    display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  }
+  .preview-banner .mono{ font-size:10.5px; letter-spacing:0.04em; }
+
+  .module-status-tag{
+    display:inline-block; font-size:10px; font-weight:600; letter-spacing:0.03em;
+    padding:2px 8px; border-radius:999px; margin-left:8px; text-transform:uppercase;
+    background:rgba(122,130,121,0.15); color:#6b7269; vertical-align:middle;
+  }
+  .module-status-tag.approved{ background:rgba(62,143,104,0.15); color:var(--pine-dim); }
+
+  .badge-row{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .badge-pill{
+    font-size:10.5px; font-weight:500; padding:3px 9px; border-radius:999px;
+    background:var(--paper-dim); border:1px solid var(--mist-line); color:#586059;
+  }
+  .badge-pill.mono{ font-family:"IBM Plex Mono", monospace; }
+
+  .safety-warning-box{
+    background:rgba(179,66,58,0.08); border:1px solid rgba(179,66,58,0.25);
+    border-radius:10px; padding:10px 12px; margin-top:10px; font-size:12.5px; color:var(--error);
+  }
+
+  .contra-tags{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .contra-tag{
+    font-size:11px; background:rgba(179,66,58,0.08); border:1px solid rgba(179,66,58,0.2);
+    border-radius:999px; padding:3px 9px; color:var(--error);
+  }
+
+  .evidence-toggle{
+    background:none; border:none; color:var(--pine-dim); font-size:12.5px; font-weight:500;
+    cursor:pointer; padding:8px 0 0; font-family:"IBM Plex Sans", sans-serif;
+  }
+  .evidence-list{ display:none; margin-top:8px; border-top:1px solid var(--mist-line); padding-top:10px; }
+  .evidence-list.open{ display:block; }
+  .evidence-item{ font-size:12.5px; margin-top:8px; }
+  .evidence-item:first-child{ margin-top:0; }
+  .evidence-item .ev-title{ font-weight:500; color:var(--ink); }
+  .evidence-item .ev-meta{ color:#7a8279; margin-top:2px; }
+  .evidence-item a{ color:var(--pine-dim); }
+
+  .wissen-pulse-link{
+    font-size:12.5px; color:var(--pine-dim); text-decoration:none; margin-top:10px; display:inline-block;
+  }
+  .wissen-pulse-link:hover{ text-decoration:underline; }
+
   .dim-icon-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
   .dim-icon-card{
     background:var(--paper); border:1px solid var(--mist-line); border-radius:14px; padding:14px;
@@ -524,7 +580,8 @@
       });
     }
 
-    const renderFn = routes[path] || (path.startsWith('/wissen/') ? renderWissen : renderAuth);
+    const routePath = path.split('?')[0];
+    const renderFn = routes[routePath] || (routePath.startsWith('/wissen/') ? renderWissen : renderAuth);
     renderFn(session, profile);
   }
 
@@ -955,81 +1012,246 @@
 
   // ------------------------------------------------------------
   // Seite: Wissen (Research Library)
+  //
+  // Datenquelle: entweder direkt aus den Tabellen (nur status='approved',
+  // Standardfall für die öffentliche/produktive Ansicht) oder — falls ein
+  // gültiger Vorschau-Token vorliegt — über die RPC get_knowledge_preview,
+  // die auch Draft-Inhalte liefert (siehe "Vitara - Preview RPC Setup.sql").
+  // Der Token wird per URL-Parameter übergeben, z. B.:
+  //   #/wissen?preview=DEIN_TOKEN
+  // und danach für die Session gespeichert, damit man beim Weiterklicken
+  // nicht jedes Mal den Parameter erneut anhängen muss.
   // ------------------------------------------------------------
   const CLAIM_STATUS_LABELS = {
     established: 'Etabliert', plausible: 'Vermutet', controversial: 'Kontrovers',
     refuted: 'Widerlegt', data_gap: 'Datenlücke',
+  };
+  const EVIDENCE_LEVEL_LABELS = {
+    A: 'Evidenzgrad A', B: 'Evidenzgrad B', C: 'Evidenzgrad C',
+    D: 'Evidenzgrad D', E: 'Evidenzgrad E',
+  };
+  const SAFETY_CLASS_LABELS = {
+    general: null,
+    caution: 'Vorsicht geboten',
+    clinician_review: 'Ärztliche Rücksprache empfohlen',
+    urgent: 'Dringender Hinweis',
+    prohibited_for_auto_use: 'Nicht automatisiert anwenden',
+  };
+  const SOURCE_TYPE_LABELS = {
+    systematic_review: 'Systematischer Review',
+    meta_analysis: 'Meta-Analyse',
+    randomized_controlled_trial: 'Randomisierte kontrollierte Studie',
+    observational_study: 'Beobachtungsstudie',
+    guideline: 'Leitlinie',
+    consensus_statement: 'Konsensuspapier',
+    other: 'Sonstige Quelle',
   };
 
   function starsHtml(n) {
     const count = Number(n) || 0;
     return '★'.repeat(count) + '☆'.repeat(Math.max(0, 5 - count));
   }
+  function starsFromEvidenceLevel(level) {
+    return { A: 5, B: 4, C: 3, D: 2, E: 1 }[level] || 0;
+  }
+
+  function getHashParts() {
+    const raw = location.hash.slice(1) || '/login';
+    const [path, queryString] = raw.split('?');
+    return { path, params: new URLSearchParams(queryString || '') };
+  }
+
+  const PREVIEW_TOKEN_STORAGE_KEY = 'vitara_preview_token';
+
+  function getPreviewToken() {
+    const { params } = getHashParts();
+    const fromUrl = params.get('preview');
+    if (fromUrl) {
+      sessionStorage.setItem(PREVIEW_TOKEN_STORAGE_KEY, fromUrl);
+      return fromUrl;
+    }
+    return sessionStorage.getItem(PREVIEW_TOKEN_STORAGE_KEY);
+  }
+
+  let knowledgeCache = null;
+
+  async function loadKnowledgeData() {
+    if (knowledgeCache) return knowledgeCache;
+
+    const token = getPreviewToken();
+
+    if (token) {
+      const { data, error } = await supabase.rpc('get_knowledge_preview', { p_token: token });
+      if (!error && data) {
+        knowledgeCache = buildKnowledgeIndex(data, true);
+        return knowledgeCache;
+      }
+      // Ungültiger/abgelaufener Token: still auf den normalen Modus zurückfallen,
+      // statt die Seite mit einem Fehler zu blockieren.
+    }
+
+    const [{ data: topics }, { data: claims }] = await Promise.all([
+      supabase.from('knowledge_topics').select('*').eq('status', 'approved'),
+      supabase.from('knowledge_claims').select('*').eq('status', 'approved'),
+    ]);
+
+    // Quellen-Tabellen sind außerhalb des Vorschau-Modus ggf. komplett gesperrt
+    // (siehe Setup-Hinweis) — das darf die restliche Seite nicht blockieren.
+    let evidenceSources = [];
+    let claimEvidence = [];
+    try {
+      const [{ data: ev }, { data: ce }] = await Promise.all([
+        supabase.from('evidence_sources').select('*'),
+        supabase.from('claim_evidence').select('*'),
+      ]);
+      evidenceSources = ev || [];
+      claimEvidence = ce || [];
+    } catch (e) {
+      // Kein Zugriff auf Quellen außerhalb des Vorschau-Modus — Claims werden
+      // trotzdem angezeigt, nur ohne aufklappbare Quellenliste.
+    }
+
+    knowledgeCache = buildKnowledgeIndex({
+      topics: topics || [], claims: claims || [],
+      evidence_sources: evidenceSources, claim_evidence: claimEvidence,
+    }, false);
+    return knowledgeCache;
+  }
+
+  function buildKnowledgeIndex(raw, isPreview) {
+    const topicsById = {};
+    const childrenByParent = {};
+    const modules = [];
+
+    (raw.topics || []).forEach(t => {
+      topicsById[t.id] = t;
+      if (t.parent_id === null || t.parent_id === undefined) {
+        modules.push(t);
+      } else {
+        if (!childrenByParent[t.parent_id]) childrenByParent[t.parent_id] = [];
+        childrenByParent[t.parent_id].push(t);
+      }
+    });
+    modules.sort((a, b) => (a.module_number ?? 99) - (b.module_number ?? 99));
+    Object.values(childrenByParent).forEach(list => list.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
+
+    const claimsByTopic = {};
+    (raw.claims || []).forEach(c => {
+      if (!claimsByTopic[c.topic_id]) claimsByTopic[c.topic_id] = [];
+      claimsByTopic[c.topic_id].push(c);
+    });
+    Object.values(claimsByTopic).forEach(list => list.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
+
+    const evidenceById = {};
+    (raw.evidence_sources || []).forEach(e => { evidenceById[e.id] = e; });
+
+    const evidenceByClaim = {};
+    (raw.claim_evidence || []).forEach(ce => {
+      const source = evidenceById[ce.evidence_source_id];
+      if (!source) return;
+      if (!evidenceByClaim[ce.claim_id]) evidenceByClaim[ce.claim_id] = [];
+      evidenceByClaim[ce.claim_id].push({ source, relevance_note: ce.relevance_note });
+    });
+
+    return { isPreview, topicsById, childrenByParent, modules, claimsByTopic, evidenceByClaim };
+  }
+
+  function breadcrumbTrail(index, topicId) {
+    const trail = [];
+    let current = index.topicsById[topicId];
+    while (current) {
+      trail.unshift(current);
+      current = current.parent_id ? index.topicsById[current.parent_id] : null;
+    }
+    return trail;
+  }
+
+  function renderBreadcrumb(index, topicId) {
+    const trail = breadcrumbTrail(index, topicId);
+    const parts = ['<a href="#/wissen">Wissen</a>'];
+    trail.forEach((t, i) => {
+      const isLast = i === trail.length - 1;
+      parts.push('<span class="sep">/</span>');
+      parts.push(isLast
+        ? `<span class="current">${escapeHtml(t.title)}</span>`
+        : `<a href="#/wissen/topic/${t.id}">${escapeHtml(t.title)}</a>`);
+    });
+    return `<div class="breadcrumb">${parts.join(' ')}</div>`;
+  }
+
+  function previewBannerHtml(index) {
+    if (!index.isPreview) return '';
+    return `
+      <div class="preview-banner">
+        <span class="mono">VORSCHAU</span>
+        <span>Diese Ansicht zeigt auch nicht freigegebene Inhalte (Status „Entwurf") — nicht die öffentliche Sicht.</span>
+      </div>
+    `;
+  }
+
+  function statusTagHtml(status) {
+    const isApproved = status === 'approved';
+    return `<span class="module-status-tag ${isApproved ? 'approved' : ''}">${isApproved ? 'Freigegeben' : 'Entwurf'}</span>`;
+  }
 
   async function renderWissen() {
     app.classList.remove('wide');
-    const path = location.hash.slice(1);
+    const { path } = getHashParts();
     const parts = path.split('/').filter(Boolean); // ['wissen', ...]
 
+    app.innerHTML = `<p class="step-sub">Wird geladen …</p>`;
+
+    let index;
+    try {
+      index = await loadKnowledgeData();
+    } catch (e) {
+      app.innerHTML = `<p class="msg err">Fehler beim Laden der Wissensbibliothek: ${escapeHtml(e?.message || String(e))}</p>`;
+      return;
+    }
+
     if (parts.length === 1) {
-      await renderWissenOverview();
+      renderWissenOverview(index);
     } else if (parts[1] === 'topic' && parts[2]) {
-      await renderWissenTopic(parts[2]);
+      renderWissenTopic(index, parts[2]);
     } else {
       location.hash = '#/wissen';
     }
   }
 
-  async function renderWissenOverview() {
-    app.innerHTML = `<p class="step-sub">Wird geladen …</p>`;
+  function renderModuleCard(index, m) {
+    const children = index.childrenByParent[m.id] || [];
+    const ownClaims = (index.claimsByTopic[m.id] || []).length;
+    const claimCount = ownClaims + children.reduce((sum, c) => sum + (index.claimsByTopic[c.id] || []).length, 0);
 
-    const { data: modules, error } = await supabase
-      .from('knowledge_topics')
-      .select('id, title, description')
-      .is('parent_id', null)
-      .eq('status', 'approved')
-      .order('module_number', { ascending: true });
+    return `
+      <div class="topic-card" data-goto="#/wissen/topic/${m.id}" style="cursor:pointer;">
+        <h3>${m.module_number ? `Modul ${m.module_number} · ` : ''}${escapeHtml(m.title)} ${statusTagHtml(m.status)}</h3>
+        <p>${escapeHtml(m.description || '')}</p>
+        <p style="font-size:11.5px; color:#9aa39c; margin-top:6px;">${claimCount} wissenschaftliche Aussage${claimCount === 1 ? '' : 'n'}</p>
+        ${children.length ? `
+          <div class="subtopic-tags">
+            ${children.map(c => `<a class="subtopic-tag" href="#/wissen/topic/${c.id}">${escapeHtml(c.title)}</a>`).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
 
-    if (error) {
-      app.innerHTML = `<p class="msg err">Fehler: ${escapeHtml(error.message)}</p>`;
-      return;
-    }
-
-    const moduleIds = (modules || []).map(m => m.id);
-    let childrenByModule = {};
-    if (moduleIds.length > 0) {
-      const { data: children } = await supabase
-        .from('knowledge_topics')
-        .select('id, title, parent_id')
-        .in('parent_id', moduleIds)
-        .eq('status', 'approved')
-        .order('sort_order', { ascending: true });
-      (children || []).forEach(c => {
-        if (!childrenByModule[c.parent_id]) childrenByModule[c.parent_id] = [];
-        childrenByModule[c.parent_id].push(c);
-      });
-    }
+  function renderWissenOverview(index) {
+    const { params } = getHashParts();
+    const prefilledQuery = params.get('q') || '';
 
     app.innerHTML = `
       <h2 class="step-title">Wissen</h2>
       <p class="step-sub">Evidenzbasierte Hintergründe zu allem, was in deinem Pulse steckt.</p>
+      ${previewBannerHtml(index)}
       <div class="wissen-search">
-        <input type="text" id="wissen-search-input" placeholder="z. B. Magnesium, Schlaf, Mikrobiom …" />
+        <input type="text" id="wissen-search-input" placeholder="z. B. Magnesium, Schlaf, Mikrobiom …" value="${escapeAttr(prefilledQuery)}" />
         <button type="button" class="btn-primary" id="wissen-search-btn" style="margin-top:0;">Suchen</button>
       </div>
       <div id="wissen-search-results"></div>
       <div id="wissen-modules">
-        ${(modules || []).map(m => `
-          <div class="topic-card" data-goto="#/wissen/topic/${m.id}" style="cursor:pointer;">
-            <h3>${escapeHtml(m.title)}</h3>
-            <p>${escapeHtml(m.description || '')}</p>
-            ${(childrenByModule[m.id] || []).length ? `
-              <div class="subtopic-tags">
-                ${childrenByModule[m.id].map(c => `<a class="subtopic-tag" href="#/wissen/topic/${c.id}">${escapeHtml(c.title)}</a>`).join('')}
-              </div>
-            ` : ''}
-          </div>
-        `).join('') || '<p class="step-sub">Noch keine freigegebenen Module.</p>'}
+        ${index.modules.map(m => renderModuleCard(index, m)).join('') || '<p class="step-sub">Noch keine Module verfügbar.</p>'}
       </div>
     `;
 
@@ -1040,92 +1262,128 @@
       });
     });
 
-    document.getElementById('wissen-search-btn').addEventListener('click', runWissenSearch);
+    document.getElementById('wissen-search-btn').addEventListener('click', runSearch);
     document.getElementById('wissen-search-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') runWissenSearch();
+      if (e.key === 'Enter') runSearch();
     });
 
-    async function runWissenSearch() {
+    if (prefilledQuery) runSearch();
+
+    function runSearch() {
       const query = document.getElementById('wissen-search-input').value.trim();
       const resultsEl = document.getElementById('wissen-search-results');
       const modulesEl = document.getElementById('wissen-modules');
       if (!query) { resultsEl.innerHTML = ''; modulesEl.style.display = 'block'; return; }
 
-      resultsEl.innerHTML = `<p class="step-sub">Suche läuft …</p>`;
+      const q = query.toLowerCase();
       modulesEl.style.display = 'none';
 
-      const { data: results, error: searchError } = await supabase.rpc('search_knowledge', { p_query: query });
+      const topicHits = Object.values(index.topicsById).filter(t => (t.title || '').toLowerCase().includes(q));
+      const claimHits = [];
+      Object.values(index.claimsByTopic).forEach(list => {
+        list.forEach(c => { if ((c.claim_text || '').toLowerCase().includes(q)) claimHits.push(c); });
+      });
 
-      if (searchError) {
-        resultsEl.innerHTML = `<p class="msg err">Fehler: ${escapeHtml(searchError.message)}</p>`;
-        return;
-      }
-
-      if (!results || results.length === 0) {
+      if (topicHits.length === 0 && claimHits.length === 0) {
         resultsEl.innerHTML = `<p class="step-sub">Keine Treffer für "${escapeHtml(query)}".</p>`;
         return;
       }
 
-      resultsEl.innerHTML = results.map(r => {
-        if (r.type === 'topic') {
-          return `
-            <a class="topic-card" href="#/wissen/topic/${r.id}">
-              <h3>${escapeHtml(r.title)}</h3>
-              <p>${escapeHtml(r.description || '')}</p>
-            </a>
-          `;
-        }
-        return `
-          <a class="topic-card" href="#/wissen/topic/${r.topic_id}">
-            <span class="stars">${starsHtml(r.stars)}</span>
-            <h3>${escapeHtml(r.claim_text)}</h3>
-            <span class="status-badge status-${r.claim_status}">${CLAIM_STATUS_LABELS[r.claim_status] || r.claim_status}</span>
+      resultsEl.innerHTML = `
+        ${topicHits.map(t => `
+          <a class="topic-card" href="#/wissen/topic/${t.id}">
+            <h3>${escapeHtml(t.title)} ${statusTagHtml(t.status)}</h3>
+            <p>${escapeHtml(t.description || '')}</p>
           </a>
-        `;
-      }).join('');
+        `).join('')}
+        ${claimHits.map(c => `
+          <a class="topic-card" href="#/wissen/topic/${c.topic_id}">
+            <span class="stars">${starsHtml(starsFromEvidenceLevel(c.evidence_level))}</span>
+            <h3>${escapeHtml(c.claim_text)}</h3>
+            <span class="status-badge status-${c.claim_status}">${CLAIM_STATUS_LABELS[c.claim_status] || c.claim_status}</span>
+          </a>
+        `).join('')}
+      `;
     }
   }
 
-  async function renderWissenTopic(topicId) {
-    app.innerHTML = `<p class="step-sub">Wird geladen …</p>`;
+  function renderClaimCard(index, c) {
+    const evidences = index.evidenceByClaim[c.id] || [];
+    const safetyLabel = SAFETY_CLASS_LABELS[c.safety_class];
+    const contraTags = Array.isArray(c.contraindication_tags) ? c.contraindication_tags : [];
 
-    const [{ data: children }, { data: topicData, error }] = await Promise.all([
-      supabase.from('knowledge_topics').select('id, title, description')
-        .eq('parent_id', topicId).eq('status', 'approved').order('sort_order', { ascending: true }),
-      supabase.rpc('get_knowledge_topic', { p_topic_id: topicId }),
-    ]);
+    return `
+      <div class="claim-card">
+        <div class="claim-top">
+          <p class="claim-text">${escapeHtml(c.claim_text)}</p>
+          <span class="stars" title="${escapeAttr(EVIDENCE_LEVEL_LABELS[c.evidence_level] || '')}">${starsHtml(starsFromEvidenceLevel(c.evidence_level))}</span>
+        </div>
+        <div class="badge-row">
+          <span class="status-badge status-${c.claim_status}">${CLAIM_STATUS_LABELS[c.claim_status] || c.claim_status}</span>
+          ${c.evidence_level ? `<span class="badge-pill mono">${escapeHtml(EVIDENCE_LEVEL_LABELS[c.evidence_level] || c.evidence_level)}</span>` : ''}
+        </div>
+        ${c.explanation ? `<p class="claim-explanation">${escapeHtml(c.explanation)}</p>` : ''}
+        ${safetyLabel ? `<div class="safety-warning-box">⚠ ${escapeHtml(safetyLabel)}</div>` : ''}
+        ${contraTags.length ? `
+          <div class="contra-tags">
+            ${contraTags.map(tag => `<span class="contra-tag">Nicht anwenden bei: ${escapeHtml(tag)}</span>`).join('')}
+          </div>
+        ` : ''}
+        ${evidences.length ? `
+          <button type="button" class="evidence-toggle" data-target="evidence-${c.id}" data-label-closed="Quellen anzeigen (${evidences.length})">Quellen anzeigen (${evidences.length})</button>
+          <div class="evidence-list" id="evidence-${c.id}">
+            ${evidences.map(({ source, relevance_note }) => `
+              <div class="evidence-item">
+                <div class="ev-title">${escapeHtml(source.title)}</div>
+                <div class="ev-meta">
+                  ${escapeHtml(source.authors || '')}${source.journal ? ' · ' + escapeHtml(source.journal) : ''}${source.publication_year ? ' · ' + source.publication_year : ''}${source.source_type ? ' · ' + escapeHtml(SOURCE_TYPE_LABELS[source.source_type] || source.source_type) : ''}
+                </div>
+                ${source.source_url || source.doi ? `<div style="margin-top:2px;"><a href="${escapeAttr(source.source_url || ('https://doi.org/' + source.doi))}" target="_blank" rel="noopener">Quelle öffnen ↗</a></div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
 
-    if (error || !topicData) {
-      app.innerHTML = `<p class="msg err">Fehler: ${escapeHtml(error?.message || 'Thema nicht gefunden.')}</p>`;
+  function renderWissenTopic(index, topicId) {
+    const topic = index.topicsById[topicId];
+    if (!topic) {
+      app.innerHTML = `
+        <p class="msg err">Dieses Thema wurde nicht gefunden${index.isPreview ? '' : ' (oder ist noch nicht freigegeben)'}.</p>
+        <a href="#/wissen" class="link-btn" style="padding-left:0;">← Zurück zu Wissen</a>
+      `;
       return;
     }
 
-    const topic = topicData.topic;
-    const claims = topicData.claims || [];
+    const children = index.childrenByParent[topicId] || [];
+    const claims = index.claimsByTopic[topicId] || [];
 
     app.innerHTML = `
-      <a href="#/wissen" class="link-btn" style="padding-left:0;">← Zurück zu Wissen</a>
-      <h2 class="step-title" style="margin-top:10px;">${escapeHtml(topic.title)}</h2>
+      ${renderBreadcrumb(index, topicId)}
+      <h2 class="step-title">${escapeHtml(topic.title)} ${statusTagHtml(topic.status)}</h2>
       ${topic.description ? `<p class="step-sub">${escapeHtml(topic.description)}</p>` : ''}
+      ${previewBannerHtml(index)}
 
-      ${children && children.length ? children.map(c => `
+      ${children.length ? children.map(c => `
         <a class="topic-card" href="#/wissen/topic/${c.id}">
           <h3>${escapeHtml(c.title)}</h3>
           <p>${escapeHtml(c.description || '')}</p>
         </a>
       `).join('') : ''}
 
-      ${claims.length ? claims.map(c => `
-        <div class="claim-card">
-          <div class="claim-top">
-            <p class="claim-text">${escapeHtml(c.claim_text)}</p>
-            <span class="stars">${starsHtml(c.stars)}</span>
-          </div>
-          <span class="status-badge status-${c.claim_status}">${CLAIM_STATUS_LABELS[c.claim_status] || c.claim_status}</span>
-          ${c.explanation ? `<p class="claim-explanation">${escapeHtml(c.explanation)}</p>` : ''}
-        </div>
-      `).join('') : (children && children.length ? '' : '<p class="step-sub">Für dieses Thema sind noch keine Aussagen freigegeben.</p>')}
+      ${claims.length ? claims.map(c => renderClaimCard(index, c)).join('')
+        : (children.length ? '' : '<p class="step-sub">Für dieses Thema sind noch keine Aussagen hinterlegt.</p>')}
     `;
+
+    document.querySelectorAll('.evidence-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const list = document.getElementById(btn.dataset.target);
+        const isOpen = list.classList.toggle('open');
+        btn.textContent = isOpen ? 'Quellen ausblenden' : btn.dataset.labelClosed;
+      });
+    });
   }
   const FAQ_ITEMS = [
     { q: 'Was mache ich in einer akuten Krise?', a: 'Die TelefonSeelsorge ist rund um die Uhr, kostenlos und anonym erreichbar: 0800 111 0 111, 0800 111 0 222 oder 116 123, auch per Chat auf telefonseelsorge.de. Vitara ersetzt keine professionelle Unterstützung.' },
@@ -1849,6 +2107,7 @@
         ${fi.positive_message ? `<p class="positive">${escapeHtml(fi.positive_message)}</p>` : ''}
         ${missionsHtml}
         ${premiumHtml}
+        <a class="wissen-pulse-link" href="#/wissen?q=${encodeURIComponent(insight.category || '')}">Wissenschaftlicher Hintergrund zu ${escapeHtml(CATEGORY_LABELS[insight.category] || insight.category)} →</a>
       </div>
     `;
   }
