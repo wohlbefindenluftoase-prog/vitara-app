@@ -1,0 +1,87 @@
+/*
+  VITARA — Self-hosted Fonts
+  Ersetzt die Google-Fonts-CDN-Einbindung (fonts.googleapis.com / fonts.gstatic.com),
+  damit keine Nutzer-IP-Adressen beim Seitenaufruf an Google übertragen werden.
+
+  Erwartete Dateistruktur (im selben Ordner wie diese CSS-Datei):
+    fraunces-400.woff2
+    fraunces-500.woff2
+    fraunces-600.woff2
+    fraunces-700.woff2
+    plexsans-400.woff2
+    plexsans-500.woff2
+    plexsans-600.woff2
+    plexmono-400.woff2
+    plexmono-500.woff2
+
+  Hinweis: Dies sind statische Schriftschnitte. Das Original nutzte bei Fraunces eine
+  Variable Font mit "optical size"-Achse (opsz) für feine Anpassungen je nach Textgröße.
+  Diese Variante verzichtet darauf zugunsten von neun einfachen, verlässlichen
+  Einzeldateien — visuell ist der Unterschied minimal.
+*/
+
+@font-face {
+  font-family: "Fraunces";
+  src: url("fraunces-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fraunces";
+  src: url("fraunces-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fraunces";
+  src: url("fraunces-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fraunces";
+  src: url("fraunces-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("plexsans-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("plexsans-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("plexsans-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("plexmono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("plexmono-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
