@@ -23,6 +23,34 @@
     background:var(--paper); color:var(--ink);
     font-family:"IBM Plex Sans", sans-serif;
   }
+
+  /* ---------- Barrierefreiheit: sichtbarer, konsistenter Fokusring ---------- */
+  /* :focus-visible statt :focus, damit der Ring bei Maus-/Touch-Klicks nicht
+     aufblitzt, aber bei Tastaturnavigation immer klar sichtbar ist. */
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+  [tabindex]:focus-visible{
+    outline: 2px solid var(--pine);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  .choice-card:focus-visible, .topic-card:focus-visible, .subtopic-tag:focus-visible,
+  .scale-btn:focus-visible, .tab:focus-visible, .app-nav-avatar:focus-visible{
+    outline: 2px solid var(--pine);
+    outline-offset: 2px;
+  }
+
+  .skip-link{
+    position:absolute; left:-9999px; top:0; z-index:100;
+    background:var(--pine-dim); color:var(--paper); padding:12px 20px;
+    border-radius:0 0 10px 0; font-size:14px; font-weight:500; text-decoration:none;
+  }
+  .skip-link:focus{ left:0; }
+
+  .sr-only{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+
   body.centered{ display:flex; align-items:center; justify-content:center; padding:24px; }
   body.shell{ display:block; }
   body.shell .content-wrap{ max-width:640px; margin:0 auto; padding:36px 24px 60px; }
@@ -51,6 +79,7 @@
     flex:1; text-align:center; padding:10px 0; border-radius:999px;
     font-size:14px; font-weight:500; cursor:pointer; color:#6b756f;
     transition:background .15s ease, color .15s ease;
+    background:none; border:none; font-family:"IBM Plex Sans", sans-serif;
   }
   .tab.active{ background:var(--ink); color:var(--paper); }
 
@@ -127,7 +156,7 @@
   .choice-card:hover{ border-color:var(--pine); }
   .choice-card.selected{ border-color:var(--pine); background:var(--paper-dim); box-shadow:inset 0 0 0 1.5px var(--pine); }
   .choice-card .title{ font-weight:500; }
-  .choice-card .sub{ font-size:12.5px; color:#7a8279; margin-top:2px; }
+  .choice-card .sub{ font-size:12.5px; color:#626e64; margin-top:2px; }
 
   .step-nav{ display:flex; align-items:center; justify-content:space-between; margin-top:24px; gap:12px; }
   .step-nav .btn-primary{ margin-top:0; flex:1; }
@@ -147,13 +176,13 @@
   }
   .scale-btn:hover{ border-color:var(--pine); }
   .scale-btn.selected{ border-color:var(--pine); background:var(--pine); color:#fff; }
-  .scale-labels{ display:flex; justify-content:space-between; font-size:12px; color:#7a8279; margin-top:8px; }
+  .scale-labels{ display:flex; justify-content:space-between; font-size:12px; color:#626e64; margin-top:8px; }
 
   .gauge-wrap{ position:relative; width:180px; height:180px; margin:16px auto 8px; }
   .gauge-wrap svg{ width:100%; height:100%; }
   .gauge-center{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
   .gauge-center .num{ font-family:"Fraunces", serif; font-size:42px; font-weight:600; }
-  .gauge-center .label{ font-family:"IBM Plex Mono", monospace; font-size:10.5px; letter-spacing:0.05em; color:#7a8279; margin-top:2px; }
+  .gauge-center .label{ font-family:"IBM Plex Mono", monospace; font-size:10.5px; letter-spacing:0.05em; color:#626e64; margin-top:2px; }
 
   .metric-row{ margin-top:16px; text-align:left; }
   .metric-row .top{ display:flex; justify-content:space-between; font-size:14px; margin-bottom:6px; }
@@ -222,8 +251,8 @@
   .subtopic-tag:hover{ border-color:var(--pine); }
 
   /* ---------- Wissen: Breadcrumb, Vorschau-Banner, Badges, Quellen ---------- */
-  .breadcrumb{ font-size:12.5px; color:#7a8279; margin-bottom:14px; display:flex; flex-wrap:wrap; gap:4px; align-items:center; overflow-wrap:break-word; }
-  .breadcrumb a{ color:#7a8279; text-decoration:none; }
+  .breadcrumb{ font-size:12.5px; color:#626e64; margin-bottom:14px; display:flex; flex-wrap:wrap; gap:4px; align-items:center; overflow-wrap:break-word; }
+  .breadcrumb a{ color:#626e64; text-decoration:none; }
   .breadcrumb a:hover{ color:var(--pine-dim); text-decoration:underline; }
   .breadcrumb .sep{ color:#c3cbc4; }
   .breadcrumb .current{ color:var(--ink); font-weight:500; }
@@ -275,7 +304,7 @@
   .evidence-item{ font-size:12.5px; margin-top:8px; overflow-wrap:break-word; }
   .evidence-item:first-child{ margin-top:0; }
   .evidence-item .ev-title{ font-weight:500; color:var(--ink); }
-  .evidence-item .ev-meta{ color:#7a8279; margin-top:2px; }
+  .evidence-item .ev-meta{ color:#626e64; margin-top:2px; }
   .evidence-item a{ color:var(--pine-dim); overflow-wrap:anywhere; word-break:break-word; }
 
   .wissen-pulse-link{
@@ -332,7 +361,7 @@
   .premium-perspective p{ font-size:13px; color:#586059; margin-top:6px; }
 
   .premium-teaser{
-    margin-top:14px; font-size:13px; color:#7a8279;
+    margin-top:14px; font-size:13px; color:#626e64;
     border-top:1px solid var(--mist-line); padding-top:12px;
   }
 
@@ -422,7 +451,7 @@
     border-radius:14px; padding:16px 18px; margin-top:24px;
   }
   .signout-box strong{ font-size:14.5px; color:var(--ink); }
-  .signout-box p{ font-size:12.5px; color:#7a8279; margin-top:2px; }
+  .signout-box p{ font-size:12.5px; color:#626e64; margin-top:2px; }
   .btn-signout{
     flex:0 0 auto; background:var(--error); color:#fff; border:none;
     font-family:"IBM Plex Sans", sans-serif; font-weight:500; font-size:13.5px;
@@ -442,14 +471,14 @@
   }
   .panel-header{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; }
   .panel-header strong{ font-size:15.5px; }
-  .panel-header p{ font-size:12.5px; color:#7a8279; margin-top:2px; }
+  .panel-header p{ font-size:12.5px; color:#626e64; margin-top:2px; }
   .panel-close{
-    background:none; border:none; font-size:18px; color:#7a8279; cursor:pointer;
+    background:none; border:none; font-size:18px; color:#626e64; cursor:pointer;
     line-height:1; padding:2px 4px;
   }
   .panel-section-title{
     font-size:12.5px; font-weight:600; letter-spacing:0.03em; text-transform:uppercase;
-    color:#7a8279; margin:20px 0 10px;
+    color:#626e64; margin:20px 0 10px;
   }
   .panel-section-title:first-of-type{ margin-top:0; }
 
@@ -461,7 +490,7 @@
     font-family:"Fraunces", serif; font-weight:600; font-size:22px;
   }
   .profile-name-block strong{ font-size:16px; }
-  .profile-name-block p{ font-size:12px; color:#7a8279; margin-top:2px; }
+  .profile-name-block p{ font-size:12px; color:#626e64; margin-top:2px; }
 
   .profile-stats-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:4px; }
   .stat-tile{
@@ -470,7 +499,7 @@
   }
   .stat-tile .stat-icon{ font-size:18px; line-height:1; }
   .stat-tile .stat-value{ font-family:"Fraunces", serif; font-weight:600; font-size:16px; line-height:1.1; }
-  .stat-tile .stat-label{ font-size:10.5px; color:#7a8279; margin-top:1px; }
+  .stat-tile .stat-label{ font-size:10.5px; color:#626e64; margin-top:1px; }
 
   /* ---------- Full profile page ---------- */
   .profile-page-hero{
@@ -484,7 +513,7 @@
     font-family:"Fraunces", serif; font-weight:600; font-size:34px;
   }
   .profile-page-hero h2{ font-size:22px; }
-  .profile-page-hero p{ font-size:13.5px; color:#7a8279; margin-top:4px; }
+  .profile-page-hero p{ font-size:13.5px; color:#626e64; margin-top:4px; }
 
   .goal-tags{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:14px; }
   .goal-tag{
@@ -498,7 +527,7 @@
   }
   .stat-tile-lg .stat-icon{ font-size:24px; }
   .stat-tile-lg .stat-value{ font-family:"Fraunces", serif; font-weight:600; font-size:22px; }
-  .stat-tile-lg .stat-label{ font-size:11px; color:#7a8279; text-align:center; }
+  .stat-tile-lg .stat-label{ font-size:11px; color:#626e64; text-align:center; }
 
   .achievement-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
   .achievement-badge{
@@ -508,14 +537,16 @@
   .achievement-badge.locked{ opacity:0.4; }
   .achievement-badge .badge-icon{ font-size:26px; }
   .achievement-badge .badge-title{ font-size:12px; font-weight:600; }
-  .achievement-badge .badge-desc{ font-size:10.5px; color:#7a8279; }
+  .achievement-badge .badge-desc{ font-size:10.5px; color:#626e64; }
 </style>
 </head>
 <body class="centered">
 
-<nav id="app-nav" class="app-nav">
+<a href="#app" class="skip-link">Zum Inhalt springen</a>
+
+<nav id="app-nav" class="app-nav" aria-label="Hauptnavigation">
   <div class="app-nav-inner">
-    <a href="#/home" class="app-nav-logo"><span class="dot"></span> Vitara</a>
+    <a href="#/home" class="app-nav-logo"><span class="dot" aria-hidden="true"></span> Vitara</a>
     <div class="app-nav-tabs">
       <a href="#/home" data-path="/home">Dashboard</a>
       <a href="#/pulse" data-path="/pulse">Pulse</a>
@@ -524,13 +555,13 @@
       <a href="#/wissen" data-path="/wissen">Wissen</a>
       <a href="#/faq" data-path="/faq">FAQ</a>
     </div>
-    <button type="button" class="app-nav-avatar" id="global-profile-nav">?</button>
+    <button type="button" class="app-nav-avatar" id="global-profile-nav" aria-label="Profilmenü öffnen" aria-haspopup="true" aria-expanded="false">?</button>
   </div>
 </nav>
 <div class="profile-panel-backdrop" id="profile-panel-backdrop"></div>
-<div class="profile-panel" id="profile-panel"></div>
+<div class="profile-panel" id="profile-panel" role="dialog" aria-modal="true" aria-label="Profilmenü"></div>
 <div class="content-wrap">
-  <div id="app" class="card"></div>
+  <div id="app" class="card" role="main" tabindex="-1"></div>
 </div>
 
 <script type="module">
@@ -619,7 +650,11 @@
 
     const routePath = path.split('?')[0];
     const renderFn = routes[routePath] || (routePath.startsWith('/wissen/') ? renderWissen : renderAuth);
-    renderFn(session, profile);
+    await renderFn(session, profile);
+    // SPA-Routenwechsel lösen keinen echten Seitenwechsel aus — Fokus manuell auf
+    // den neuen Inhalt setzen, damit Tastatur- und Screenreader-Nutzer:innen merken,
+    // dass sich etwas geändert hat, statt "hängen zu bleiben".
+    app.focus({ preventScroll: true });
   }
 
   window.addEventListener('hashchange', router);
@@ -630,16 +665,27 @@
   // Schnellmenü Profil: öffnet als Panel neben dem Avatar,
   // keine eigene Seite/Route.
   // ------------------------------------------------------------
-  function openProfilePanel() {
+  async function openProfilePanel() {
     document.getElementById('profile-panel').style.display = 'block';
     document.getElementById('profile-panel-backdrop').style.display = 'block';
-    if (currentSession) renderProfilePanel(currentSession);
+    document.getElementById('global-profile-nav')?.setAttribute('aria-expanded', 'true');
+    if (currentSession) {
+      await renderProfilePanel(currentSession);
+      // Fokus ins Panel setzen, sobald es Inhalt hat — sonst bleibt der Tastaturfokus
+      // optisch "verloren" auf dem jetzt dahinterliegenden Avatar-Button.
+      document.getElementById('panel-close-btn')?.focus();
+    }
   }
   function closeProfilePanel() {
     const panel = document.getElementById('profile-panel');
     const backdrop = document.getElementById('profile-panel-backdrop');
+    const wasOpen = panel && panel.style.display === 'block';
     if (panel) panel.style.display = 'none';
     if (backdrop) backdrop.style.display = 'none';
+    document.getElementById('global-profile-nav')?.setAttribute('aria-expanded', 'false');
+    // Fokus zurück auf den Avatar-Button, der das Panel geöffnet hat — sonst
+    // "verschwindet" der Tastaturfokus beim Schließen ins Leere.
+    if (wasOpen) document.getElementById('global-profile-nav')?.focus();
   }
   function isProfilePanelOpen() {
     const panel = document.getElementById('profile-panel');
@@ -658,10 +704,10 @@
   // ------------------------------------------------------------
   function renderAuth() {
     app.innerHTML = `
-      <div class="logo"><span class="dot"></span> Vitara</div>
-      <div class="tabs">
-        <div class="tab active" id="tab-login">Anmelden</div>
-        <div class="tab" id="tab-register">Registrieren</div>
+      <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
+      <div class="tabs" role="tablist" aria-label="Anmelden oder registrieren">
+        <button type="button" class="tab active" id="tab-login" role="tab" aria-selected="true">Anmelden</button>
+        <button type="button" class="tab" id="tab-register" role="tab" aria-selected="false">Registrieren</button>
       </div>
       <form id="auth-form">
         <div>
@@ -686,7 +732,9 @@
     function setMode(newMode) {
       mode = newMode;
       tabLogin.classList.toggle('active', mode === 'login');
+      tabLogin.setAttribute('aria-selected', String(mode === 'login'));
       tabRegister.classList.toggle('active', mode === 'register');
+      tabRegister.setAttribute('aria-selected', String(mode === 'register'));
       submitBtn.textContent = mode === 'login' ? 'Anmelden' : 'Konto erstellen';
       msg.textContent = '';
       msg.className = 'msg';
@@ -871,7 +919,7 @@
       const isOptionalStep = step === 'basics' || step === 'body';
 
       app.innerHTML = `
-        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
         <div class="progress-dots">
           ${steps.slice(0, -1).map((_, i) => `<div class="dot-step ${i <= stepIndex ? 'done' : ''}"></div>`).join('')}
         </div>
@@ -1013,7 +1061,7 @@
         .filter(Boolean);
       const goalText = goalLabels.length ? goalLabels.join(', ') : 'deine Gesundheit';
       app.innerHTML = `
-        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
         <div class="placeholder">
           <h2>Alles bereit${data.first_name ? ', ' + escapeHtml(data.first_name) : ''}.</h2>
           <p>Dein erster Pulse dauert nur etwa 10 Minuten und gibt dir ein erstes Bild zu <strong>${escapeHtml(goalText)}</strong> — und den anderen Dimensionen gleich mit.</p>
@@ -1057,7 +1105,7 @@
   function emptyStateHtml({ icon = '🌱', title = '', text = '', actionLabel = '', actionHref = '' } = {}) {
     return `
       <div class="state-card">
-        ${icon ? `<div class="state-icon">${icon}</div>` : ''}
+        ${icon ? `<div class="state-icon" aria-hidden="true">${icon}</div>` : ''}
         ${title ? `<h3>${escapeHtml(title)}</h3>` : ''}
         ${text ? `<p>${escapeHtml(text)}</p>` : ''}
         ${actionHref ? `<a class="btn-primary" href="${actionHref}">${escapeHtml(actionLabel || 'Weiter')}</a>` : ''}
@@ -1067,8 +1115,8 @@
 
   function errorStateHtml({ text = '', retryId = '' } = {}) {
     return `
-      <div class="state-card error">
-        <div class="state-icon">⚠</div>
+      <div class="state-card error" role="alert">
+        <div class="state-icon" aria-hidden="true">⚠</div>
         <h3>Das hat gerade nicht geklappt</h3>
         <p>${escapeHtml(text || 'Bitte versuch es gleich noch einmal.')}</p>
         ${retryId ? `<button type="button" class="retry-btn" id="${retryId}">Erneut versuchen</button>` : ''}
@@ -1295,12 +1343,14 @@
     const children = index.childrenByParent[m.id] || [];
     const ownClaims = (index.claimsByTopic[m.id] || []).length;
     const claimCount = ownClaims + children.reduce((sum, c) => sum + (index.claimsByTopic[c.id] || []).length, 0);
+    const moduleLabel = `${m.module_number ? `Modul ${m.module_number}: ` : ''}${m.title} öffnen`;
 
     return `
-      <div class="topic-card" data-goto="#/wissen/topic/${m.id}" style="cursor:pointer;">
+      <div class="topic-card" data-goto="#/wissen/topic/${m.id}" style="cursor:pointer;"
+           role="link" tabindex="0" aria-label="${escapeAttr(moduleLabel)}">
         <h3>${m.module_number ? `Modul ${m.module_number} · ` : ''}${escapeHtml(m.title)} ${statusTagHtml(m.status)}</h3>
         <p>${escapeHtml(m.description || '')}</p>
-        <p style="font-size:11.5px; color:#9aa39c; margin-top:6px;">${claimCount} wissenschaftliche Aussage${claimCount === 1 ? '' : 'n'}</p>
+        <p style="font-size:11.5px; color:#697168; margin-top:6px;">${claimCount} wissenschaftliche Aussage${claimCount === 1 ? '' : 'n'}</p>
         ${children.length ? `
           <div class="subtopic-tags">
             ${children.map(c => `<a class="subtopic-tag" href="#/wissen/topic/${c.id}">${escapeHtml(c.title)}</a>`).join('')}
@@ -1319,10 +1369,11 @@
       <p class="step-sub">Evidenzbasierte Hintergründe zu allem, was in deinem Pulse steckt.</p>
       ${previewBannerHtml(index)}
       <div class="wissen-search">
+        <label for="wissen-search-input" class="sr-only">Wissensbibliothek durchsuchen</label>
         <input type="text" id="wissen-search-input" placeholder="z. B. Magnesium, Schlaf, Mikrobiom …" value="${escapeAttr(prefilledQuery)}" />
         <button type="button" class="btn-primary" id="wissen-search-btn" style="margin-top:0;">Suchen</button>
       </div>
-      <div id="wissen-search-results"></div>
+      <div id="wissen-search-results" aria-live="polite"></div>
       <div id="wissen-modules">
         ${index.modules.map(m => renderModuleCard(index, m)).join('') || '<p class="step-sub">Noch keine Module verfügbar.</p>'}
       </div>
@@ -1332,6 +1383,12 @@
       card.addEventListener('click', (e) => {
         if (e.target.closest('.subtopic-tag')) return; // eigener Link, nicht überschreiben
         location.hash = card.dataset.goto;
+      });
+      // Karten sind Divs mit role="link" statt echten <a>-Tags (wegen der
+      // verschachtelten Subtopic-Links) — Enter muss deshalb manuell nachgebaut werden.
+      card.addEventListener('keydown', (e) => {
+        if (e.target.closest('.subtopic-tag')) return;
+        if (e.key === 'Enter') { e.preventDefault(); location.hash = card.dataset.goto; }
       });
     });
 
@@ -1371,7 +1428,7 @@
         `).join('')}
         ${claimHits.map(c => `
           <a class="topic-card" href="#/wissen/topic/${c.topic_id}">
-            <span class="stars">${starsHtml(starsFromEvidenceLevel(c.evidence_level))}</span>
+            <span class="stars" aria-label="${starsFromEvidenceLevel(c.evidence_level)} von 5, ${escapeAttr(EVIDENCE_LEVEL_LABELS[c.evidence_level] || '')}">${starsHtml(starsFromEvidenceLevel(c.evidence_level))}</span>
             <h3>${escapeHtml(c.claim_text)}</h3>
             <span class="status-badge status-${c.claim_status}">${CLAIM_STATUS_LABELS[c.claim_status] || c.claim_status}</span>
           </a>
@@ -1389,14 +1446,14 @@
       <div class="claim-card">
         <div class="claim-top">
           <p class="claim-text">${escapeHtml(c.claim_text)}</p>
-          <span class="stars" title="${escapeAttr(EVIDENCE_LEVEL_LABELS[c.evidence_level] || '')}">${starsHtml(starsFromEvidenceLevel(c.evidence_level))}</span>
+          <span class="stars" aria-label="${starsFromEvidenceLevel(c.evidence_level)} von 5, ${escapeAttr(EVIDENCE_LEVEL_LABELS[c.evidence_level] || '')}">${starsHtml(starsFromEvidenceLevel(c.evidence_level))}</span>
         </div>
         <div class="badge-row">
           <span class="status-badge status-${c.claim_status}">${CLAIM_STATUS_LABELS[c.claim_status] || c.claim_status}</span>
           ${c.evidence_level ? `<span class="badge-pill mono">${escapeHtml(EVIDENCE_LEVEL_LABELS[c.evidence_level] || c.evidence_level)}</span>` : ''}
         </div>
         ${c.explanation ? `<p class="claim-explanation">${escapeHtml(c.explanation)}</p>` : ''}
-        ${safetyLabel ? `<div class="safety-warning-box">⚠ ${escapeHtml(safetyLabel)}</div>` : ''}
+        ${safetyLabel ? `<div class="safety-warning-box"><span aria-hidden="true">⚠</span> ${escapeHtml(safetyLabel)}</div>` : ''}
         ${contraTags.length ? `
           <div class="contra-tags">
             ${contraTags.map(tag => `<span class="contra-tag">Nicht anwenden bei: ${escapeHtml(tag)}</span>`).join('')}
@@ -1521,7 +1578,7 @@
           <strong>${escapeHtml(profile.first_name || 'Dein Profil')}</strong>
           <p>${profile.premium ? 'Premium' : 'Free'} · ${escapeHtml(session.user.email)}</p>
         </div>
-        <button type="button" class="panel-close" id="panel-close-btn">✕</button>
+        <button type="button" class="panel-close" id="panel-close-btn" aria-label="Profilmenü schließen">✕</button>
       </div>
 
       <div class="profile-stats-header">
@@ -1534,19 +1591,19 @@
       <a href="#/profile" id="view-full-profile-link" class="link-btn" style="padding-left:0; display:block; margin-bottom:14px;">Vollständiges Profil ansehen →</a>
       <div class="profile-stats-grid">
         <div class="stat-tile">
-          <span class="stat-icon">🔥</span>
+          <span class="stat-icon" aria-hidden="true">🔥</span>
           <div><div class="stat-value">${profile.current_streak ?? 0}</div><div class="stat-label">Streak-Wochen</div></div>
         </div>
         <div class="stat-tile">
-          <span class="stat-icon">🏆</span>
+          <span class="stat-icon" aria-hidden="true">🏆</span>
           <div><div class="stat-value">${profile.longest_streak ?? 0}</div><div class="stat-label">Bestwert</div></div>
         </div>
         <div class="stat-tile">
-          <span class="stat-icon">📊</span>
+          <span class="stat-icon" aria-hidden="true">📊</span>
           <div><div class="stat-value">${totalPulses}</div><div class="stat-label">Pulses gesamt</div></div>
         </div>
         <div class="stat-tile">
-          <span class="stat-icon">⭐</span>
+          <span class="stat-icon" aria-hidden="true">⭐</span>
           <div><div class="stat-value">${avgScore}</div><div class="stat-label">Ø Pulse Score</div></div>
         </div>
       </div>
@@ -1617,13 +1674,13 @@
           ${profile.premium ? '<span class="streak-badge" style="margin-top:0; padding:4px 10px; font-size:12px;">Aktiv</span>' : ''}
         </div>
         ${profile.premium ? `
-          <p style="font-size:12.5px; color:#7a8279; margin-top:8px;">Du hast Zugriff auf Funktionelle Medizin, Longevity und Biohacking Perspektiven.</p>
+          <p style="font-size:12.5px; color:#626e64; margin-top:8px;">Du hast Zugriff auf Funktionelle Medizin, Longevity und Biohacking Perspektiven.</p>
           <button type="button" class="link-btn" id="cancel-premium-btn" style="color:var(--error); padding-left:0; margin-top:8px;">Abo kündigen</button>
         ` : `
-          <p style="font-size:12.5px; color:#7a8279; margin-top:8px;">Premium schaltet drei tiefere Perspektiven pro Insight frei: Funktionelle Medizin, Longevity, Biohacking.</p>
+          <p style="font-size:12.5px; color:#626e64; margin-top:8px;">Premium schaltet drei tiefere Perspektiven pro Insight frei: Funktionelle Medizin, Longevity, Biohacking.</p>
           <button type="button" class="link-btn" id="upgrade-premium-btn" style="padding-left:0; margin-top:8px;">Zu Premium wechseln</button>
         `}
-        <p style="font-size:11px; color:#9aa39c; margin-top:8px;">Echte Zahlungsabwicklung folgt später — hier wird aktuell nur der Plan-Status gesetzt.</p>
+        <p style="font-size:11px; color:#697168; margin-top:8px;">Echte Zahlungsabwicklung folgt später — hier wird aktuell nur der Plan-Status gesetzt.</p>
         <p class="msg" id="plan-msg" role="status"></p>
       </div>
 
@@ -1643,7 +1700,7 @@
       <p class="msg" id="export-msg" role="status"></p>
 
       <p class="panel-section-title" style="color:var(--error);">Gefahrenzone</p>
-      <p style="font-size:12.5px; color:#7a8279;">Löscht dein Profil und alle Daten unwiderruflich.</p>
+      <p style="font-size:12.5px; color:#626e64;">Löscht dein Profil und alle Daten unwiderruflich.</p>
       <button type="button" class="link-btn" id="show-delete-btn" style="color:var(--error); padding-left:0; margin-top:6px;">Profil löschen</button>
       <div id="delete-confirm-area" style="display:none; margin-top:12px;">
         <label for="delete-confirm-input">Tippe <strong>LÖSCHEN</strong> ein, um zu bestätigen</label>
@@ -1851,7 +1908,7 @@
 
   async function renderPulse(session) {
     app.classList.add('wide');
-    app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Dein Pulse wird vorbereitet …</p>`;
+    app.innerHTML = `<div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div><p class="step-sub">Dein Pulse wird vorbereitet …</p>`;
 
     const { data: questions, error: qError } = await supabase
       .from('questions')
@@ -1861,7 +1918,7 @@
 
     if (qError || !questions || questions.length === 0) {
       app.innerHTML = `
-        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
         ${errorStateHtml({ text: 'Der Fragebogen konnte nicht geladen werden' + (qError ? ` (${qError.message})` : '') + '.', retryId: 'pulse-questions-retry-btn' })}
       `;
       bindRetryButton('pulse-questions-retry-btn');
@@ -1894,7 +1951,7 @@
         .select('id')
         .single();
       if (sError) {
-        app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div>${errorStateHtml({ text: sError.message, retryId: 'pulse-newsession-retry-btn' })}`;
+        app.innerHTML = `<div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>${errorStateHtml({ text: sError.message, retryId: 'pulse-newsession-retry-btn' })}`;
         bindRetryButton('pulse-newsession-retry-btn');
         return;
       }
@@ -1914,12 +1971,12 @@
       const answeredSoFar = answeredQuestionIds.length + qIndex;
 
       app.innerHTML = `
-        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
         <div class="progress-dots">
           ${questions.map((_, i) => `<div class="dot-step ${i < answeredSoFar ? 'done' : ''}"></div>`).join('')}
         </div>
-        <p class="mono" style="font-size:11.5px; color:#7a8279; margin-bottom:6px;">${CATEGORY_LABELS[q.category] || q.category} · FRAGE ${answeredSoFar + 1} VON ${questions.length}</p>
-        <h2 class="step-title">${escapeHtml(q.question_text)}</h2>
+        <p class="mono" style="font-size:11.5px; color:#626e64; margin-bottom:6px;">${CATEGORY_LABELS[q.category] || q.category} · FRAGE ${answeredSoFar + 1} VON ${questions.length}</p>
+        <h2 class="step-title" id="pulse-question-text">${escapeHtml(q.question_text)}</h2>
         <div style="margin-top:20px;">${renderAnswerInput(q)}</div>
         <p class="msg" id="pulse-msg" role="status"></p>
         <div class="step-nav" style="margin-top:20px;">
@@ -1942,15 +1999,16 @@
         const min = q.min_value ?? 1, max = q.max_value ?? 10;
         const startValue = Math.round((min + max) / 2);
         return `
-          <div class="scale-value-display" id="scale-value-display">${startValue}</div>
-          <input type="range" id="answer-scale-slider" min="${min}" max="${max}" step="1" value="${startValue}" />
+          <div class="scale-value-display" id="scale-value-display" aria-hidden="true">${startValue}</div>
+          <input type="range" id="answer-scale-slider" min="${min}" max="${max}" step="1" value="${startValue}"
+                 aria-labelledby="pulse-question-text" aria-valuetext="${startValue} von ${max}" />
           <div class="scale-labels">
             <span>${min} = ${q.answer_type === 'scale_reverse' ? 'Gar nicht' : 'Sehr niedrig'}</span>
             <span>${max} = ${q.answer_type === 'scale_reverse' ? 'Sehr stark' : 'Sehr hoch'}</span>
           </div>
         `;
       }
-      return `<input type="number" id="answer-number" min="${q.min_value ?? ''}" max="${q.max_value ?? ''}" placeholder="Zahl eingeben" />`;
+      return `<input type="number" id="answer-number" aria-labelledby="pulse-question-text" min="${q.min_value ?? ''}" max="${q.max_value ?? ''}" placeholder="Zahl eingeben" />`;
     }
 
     async function submitAnswer(q) {
@@ -2000,7 +2058,7 @@
 
     function renderSafetyCheck() {
       app.innerHTML = `
-        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
         <div class="safety-card">
           <h2>Bevor wir weitermachen</h2>
           <p>Deine Antwort deutet darauf hin, dass die Belastung gerade sehr groß ist. Das nehmen wir ernst.</p>
@@ -2010,7 +2068,7 @@
             <p>📞 0800 111 0 111 oder 0800 111 0 222 (auch: 116 123)</p>
             <p><a href="https://www.telefonseelsorge.de" target="_blank" rel="noopener">telefonseelsorge.de</a> — auch per Chat oder Mail erreichbar</p>
           </div>
-          <p style="font-size:12.5px; color:#7a8279; margin-top:14px;">Vitara ersetzt keine professionelle Unterstützung.</p>
+          <p style="font-size:12.5px; color:#626e64; margin-top:14px;">Vitara ersetzt keine professionelle Unterstützung.</p>
         </div>
         <button type="button" class="btn-primary" id="safety-continue-btn" style="margin-top:20px;">Mit dem Pulse fortfahren</button>
       `;
@@ -2021,12 +2079,12 @@
     }
 
     async function finishPulse() {
-      app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Dein Pulse Score wird berechnet …</p>`;
+      app.innerHTML = `<div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div><p class="step-sub">Dein Pulse Score wird berechnet …</p>`;
 
       const { data: calcResult, error } = await supabase.rpc('calculate_pulse_scores', { p_session_id: pulseSessionId });
 
       if (error) {
-        app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div>${errorStateHtml({ text: error.message, retryId: 'pulse-finish-retry-btn' })}`;
+        app.innerHTML = `<div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>${errorStateHtml({ text: error.message, retryId: 'pulse-finish-retry-btn' })}`;
         document.getElementById('pulse-finish-retry-btn')?.addEventListener('click', () => finishPulse());
         return;
       }
@@ -2053,10 +2111,10 @@
       ];
 
       app.innerHTML = `
-        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
         ${newAchievements && newAchievements.length ? newAchievements.map(a => `
           <div style="background:var(--pine-dim); color:var(--paper); border-radius:12px; padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:10px;">
-            <span style="font-size:20px;">🏅</span>
+            <span style="font-size:20px;" aria-hidden="true">🏅</span>
             <div>
               <strong style="font-size:13.5px;">Neuer Erfolg: ${escapeHtml(a.title)}</strong>
               <p style="font-size:12px; color:#D7E4DC; margin-top:2px;">${escapeHtml(a.description)}</p>
@@ -2064,7 +2122,7 @@
           </div>
         `).join('') : ''}
         <div style="text-align:center;">
-          <p class="mono" style="font-size:11.5px; color:#7a8279;">DEIN PULSE SCORE</p>
+          <p class="mono" style="font-size:11.5px; color:#626e64;">DEIN PULSE SCORE</p>
           <div class="gauge-wrap">
             <svg viewBox="0 0 180 180">
               <circle cx="90" cy="90" r="78" fill="none" stroke="var(--mist)" stroke-width="13" />
@@ -2101,7 +2159,7 @@
 
   async function renderInsights(session) {
     app.classList.add('wide');
-    app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Deine Erkenntnisse werden geladen …</p>`;
+    app.innerHTML = `<div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div><p class="step-sub">Deine Erkenntnisse werden geladen …</p>`;
 
     const { data: latestSession, error: sessionError } = await supabase
       .from('pulse_sessions')
@@ -2114,7 +2172,7 @@
 
     if (sessionError || !latestSession) {
       app.innerHTML = `
-        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
         ${emptyStateHtml({
           icon: '📊',
           title: 'Noch kein abgeschlossener Pulse',
@@ -2131,7 +2189,7 @@
     });
 
     if (insightsError) {
-      app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div>${errorStateHtml({ text: insightsError.message, retryId: 'insights-retry-btn' })}`;
+      app.innerHTML = `<div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>${errorStateHtml({ text: insightsError.message, retryId: 'insights-retry-btn' })}`;
       bindRetryButton('insights-retry-btn');
       return;
     }
@@ -2140,7 +2198,7 @@
     const order = ['energy', 'recovery', 'performance', 'resilience', 'longevity'];
 
     app.innerHTML = `
-      <div class="logo"><span class="dot"></span> Vitara</div>
+      <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
       <h2 class="step-title">Deine Erkenntnisse</h2>
       <p class="step-sub">Pulse vom ${dateLabel} · Score ${latestSession.pulse_score}</p>
       ${order.map(key => renderInsightCard(insights[key])).join('')}
@@ -2202,7 +2260,7 @@
 
   async function renderMission(session) {
     app.classList.add('wide');
-    app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Deine Mission wird ausgewählt …</p>`;
+    app.innerHTML = `<div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div><p class="step-sub">Deine Mission wird ausgewählt …</p>`;
 
     const { data: latestSession, error: sessionError } = await supabase
       .from('pulse_sessions')
@@ -2215,7 +2273,7 @@
 
     if (sessionError || !latestSession) {
       app.innerHTML = `
-        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
         ${emptyStateHtml({
           icon: '🎯',
           title: 'Noch keine Mission verfügbar',
@@ -2232,7 +2290,7 @@
     });
 
     if (insightsError) {
-      app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div>${errorStateHtml({ text: insightsError.message, retryId: 'mission-retry-btn' })}`;
+      app.innerHTML = `<div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>${errorStateHtml({ text: insightsError.message, retryId: 'mission-retry-btn' })}`;
       bindRetryButton('mission-retry-btn');
       return;
     }
@@ -2258,7 +2316,7 @@
 
     if (!chosen) {
       app.innerHTML = `
-        <div class="logo"><span class="dot"></span> Vitara</div>
+        <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
         ${emptyStateHtml({
           icon: '🎯',
           title: 'Keine Mission hinterlegt',
@@ -2274,8 +2332,8 @@
     const fi = insight.free_insight;
 
     app.innerHTML = `
-      <div class="logo"><span class="dot"></span> Vitara</div>
-      <p class="mono" style="font-size:11.5px; color:#7a8279;">DEINE MISSION BIS ZUM NÄCHSTEN PULSE</p>
+      <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
+      <p class="mono" style="font-size:11.5px; color:#626e64;">DEINE MISSION BIS ZUM NÄCHSTEN PULSE</p>
       <p class="step-sub">Dein ${category}-Score liegt aktuell bei ${score} — hier lohnt sich gerade der größte Hebel.</p>
 
       <div class="mission-hero">
@@ -2287,7 +2345,7 @@
           ${mission.duration_days ? `<span>${mission.duration_days} Tage</span>` : ''}
           ${mission.difficulty ? `<span>${DIFFICULTY_LABELS[mission.difficulty] || mission.difficulty}</span>` : ''}
         </div>
-        ${mission.safety_note ? `<div class="mission-safety">⚠ ${escapeHtml(mission.safety_note)}</div>` : ''}
+        ${mission.safety_note ? `<div class="mission-safety"><span aria-hidden="true">⚠</span> ${escapeHtml(mission.safety_note)}</div>` : ''}
       </div>
 
       ${fi.summary || fi.positive_message ? `
@@ -2367,22 +2425,22 @@
 
       <div class="profile-stats-grid" style="grid-template-columns:1fr 1fr;">
         <div class="stat-tile-lg">
-          <span class="stat-icon">🔥</span>
+          <span class="stat-icon" aria-hidden="true">🔥</span>
           <div class="stat-value">${profile.current_streak ?? 0}</div>
           <div class="stat-label">Streak-Wochen</div>
         </div>
         <div class="stat-tile-lg">
-          <span class="stat-icon">🏆</span>
+          <span class="stat-icon" aria-hidden="true">🏆</span>
           <div class="stat-value">${profile.longest_streak ?? 0}</div>
           <div class="stat-label">Bestwert</div>
         </div>
         <div class="stat-tile-lg">
-          <span class="stat-icon">📊</span>
+          <span class="stat-icon" aria-hidden="true">📊</span>
           <div class="stat-value">${totalPulses}</div>
           <div class="stat-label">Pulses gesamt</div>
         </div>
         <div class="stat-tile-lg">
-          <span class="stat-icon">⭐</span>
+          <span class="stat-icon" aria-hidden="true">⭐</span>
           <div class="stat-value">${avgScore}</div>
           <div class="stat-label">Ø Pulse Score</div>
         </div>
@@ -2394,7 +2452,7 @@
           const unlocked = unlockedKeys.includes(def.key);
           return `
             <div class="achievement-badge ${unlocked ? '' : 'locked'}">
-              <span class="badge-icon">${def.icon}</span>
+              <span class="badge-icon" aria-hidden="true">${def.icon}</span>
               <span class="badge-title">${escapeHtml(def.title)}</span>
               <span class="badge-desc">${escapeHtml(def.description)}</span>
             </div>
@@ -2414,7 +2472,7 @@
 
   async function renderHome(session, profile) {
     app.classList.remove('wide');
-    app.innerHTML = `<div class="logo"><span class="dot"></span> Vitara</div><p class="step-sub">Dein Dashboard wird geladen …</p>`;
+    app.innerHTML = `<div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div><p class="step-sub">Dein Dashboard wird geladen …</p>`;
 
     const { data: fullProfile } = await supabase
       .from('profiles')
@@ -2439,12 +2497,12 @@
     const delta = latest && previous ? latest.pulse_score - previous.pulse_score : null;
 
     app.innerHTML = `
-      <div class="logo"><span class="dot"></span> Vitara</div>
+      <div class="logo"><span class="dot" aria-hidden="true"></span> Vitara</div>
       <h2 class="step-title">Willkommen zurück${name ? ', ' + escapeHtml(name) : ''}.</h2>
       ${latest ? `<p class="step-sub">Letzter Pulse: ${new Date(latest.pulse_date).toLocaleDateString('de-DE', { day: '2-digit', month: 'long' })}</p>` : ''}
       ${streak > 0 ? `
-        <div class="streak-badge">🔥 ${streak} ${streak === 1 ? 'Woche' : 'Wochen'} in Folge</div>
-        ${fullProfile?.longest_streak > streak ? `<span style="font-size:12.5px; color:#7a8279; margin-left:8px;">Bestwert: ${fullProfile.longest_streak}</span>` : ''}
+        <div class="streak-badge"><span aria-hidden="true">🔥</span> ${streak} ${streak === 1 ? 'Woche' : 'Wochen'} in Folge</div>
+        ${fullProfile?.longest_streak > streak ? `<span style="font-size:12.5px; color:#626e64; margin-left:8px;">Bestwert: ${fullProfile.longest_streak}</span>` : ''}
       ` : ''}
 
       ${latest ? renderGauge(latest.pulse_score, delta) : emptyStateHtml({
@@ -2461,7 +2519,7 @@
       ${orderedHistory.length > 1 ? `
         <h3 style="font-size:16px; margin-top:26px;">Score-Verlauf</h3>
         ${renderTrendChart(orderedHistory)}
-        <div style="display:flex; justify-content:space-between; font-size:11.5px; color:#7a8279; margin-top:4px;">
+        <div style="display:flex; justify-content:space-between; font-size:11.5px; color:#626e64; margin-top:4px;">
           <span>${new Date(orderedHistory[0].pulse_date).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</span>
           <span>${new Date(orderedHistory[orderedHistory.length - 1].pulse_date).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</span>
         </div>
@@ -2489,7 +2547,7 @@
       <div class="dim-icon-grid">
         ${dims.map(([label, value, icon]) => `
           <div class="dim-icon-card">
-            <div class="dim-icon-circle">${icon}</div>
+            <div class="dim-icon-circle" aria-hidden="true">${icon}</div>
             <div class="dim-name">${label}</div>
             <div class="dim-score">${value}</div>
             <div class="bar-track" style="margin-top:8px;"><div class="bar-fill" style="width:${value}%"></div></div>
